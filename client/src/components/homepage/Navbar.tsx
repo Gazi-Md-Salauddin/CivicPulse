@@ -33,7 +33,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white shadow-sm">
-      <nav className="container mx-auto flex min-h-18 items-center justify-between gap-4 px-4 lg:px-6">
+      <nav className="container mx-auto flex min-h-18 items-center justify-between gap-4 px-4 lg:px-2">
 
         {/* Logo and Brand */}
         <Link
@@ -55,15 +55,6 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Platform Badge */}
-        <div className="hidden shrink-0 rounded-sm bg-slate-100 px-2 py-1.5 text-center md:block">
-          <p className="text-[9px] font-bold uppercase leading-3 tracking-wider text-slate-600">
-            GovTech
-            <br />
-            Platform
-          </p>
-        </div>
-
         {/* Desktop Navigation */}
         <div className="hidden flex-1 items-center justify-center gap-1 xl:flex">
           {navLinks.map((link) => {
@@ -74,11 +65,10 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => handleNavigation(link.href)}
-                className={`rounded-md px-3 py-2 text-center text-[13px] font-medium leading-5 transition-all duration-200 ${
-                  isActive
+                className={`rounded-md px-3 py-2 text-center text-[13px] font-medium leading-5 transition-all duration-200 ${isActive
                     ? "bg-teal-700 text-white shadow-sm"
                     : "text-slate-700 hover:bg-slate-100 hover:text-teal-700"
-                }`}
+                  }`}
               >
                 {link.name}
               </Link>
@@ -102,7 +92,7 @@ export default function Navbar() {
           </Link>
 
           <Link
-            href="/sign-in"
+            href="/auth/login"
             className="px-3 py-3 text-[13px] font-medium text-slate-700 transition hover:text-teal-700"
           >
             Sign In
@@ -120,13 +110,13 @@ export default function Navbar() {
             </span>
           </Link>
 
-          <Link
+          {/* <Link
             href="/profile"
             aria-label="User profile"
             className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-800 text-white transition hover:bg-teal-900"
           >
             <UserRound size={18} />
-          </Link>
+          </Link> */}
         </div>
 
         {/* Mobile Menu Button */}
@@ -142,11 +132,10 @@ export default function Navbar() {
 
       {/* Mobile Navigation */}
       <div
-        className={`overflow-hidden border-t border-slate-100 bg-white transition-all duration-300 ease-in-out xl:hidden ${
-          mobileMenuOpen
+        className={`overflow-hidden border-t border-slate-100 bg-white transition-all duration-300 ease-in-out xl:hidden ${mobileMenuOpen
             ? "max-h-[650px] opacity-100"
             : "max-h-0 border-t-0 opacity-0"
-        }`}
+          }`}
       >
         <div className="space-y-2 px-4 py-4">
           {/* Mobile Branding */}
@@ -171,11 +160,10 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => handleNavigation(link.href)}
-                className={`flex items-center justify-between rounded-md px-4 py-3 text-sm font-medium transition ${
-                  isActive
+                className={`flex items-center justify-between rounded-md px-4 py-3 text-sm font-medium transition ${isActive
                     ? "bg-teal-700 text-white"
                     : "text-slate-700 hover:bg-slate-100"
-                }`}
+                  }`}
               >
                 {link.name}
                 {isActive && <ChevronDown size={16} />}
@@ -195,19 +183,19 @@ export default function Navbar() {
 
           <div className="grid grid-cols-2 gap-2 pt-2">
             <Link
-              href="/sign-in"
+              href="/auth/login"
               className="flex items-center justify-center rounded-md border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Sign In
+              Login
             </Link>
 
-            <Link
+            {/* <Link
               href="/profile"
               className="flex items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               <UserRound size={16} />
               Profile
-            </Link>
+            </Link> */}
           </div>
 
           <Link

@@ -70,7 +70,7 @@ export default function Banner() {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
 
             <Link
-              href="/citizen-reporting"
+              href="/create-issue"
               className="group inline-flex w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-teal-900/10 transition-all duration-300 hover:-translate-y-1 hover:bg-teal-800 sm:w-auto"
             >
               <MapPin size={17} />
