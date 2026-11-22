@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -11,6 +10,7 @@ import {
   Megaphone,
   UserRound,
   ChevronDown,
+  ArrowRight,
 } from "lucide-react";
 
 const navLinks = [
@@ -86,8 +86,6 @@ export default function Navbar() {
             <MapPinned size={15} className="text-teal-700" />
             <span>
               Live Incident
-              <br />
-              Map
             </span>
           </Link>
 
@@ -99,15 +97,13 @@ export default function Navbar() {
           </Link>
 
           <Link
-            href="/citizen-access"
+            href="/auth/register"
             className="flex items-center gap-2 rounded-md bg-teal-700 px-4 py-3 text-[12px] font-bold text-white transition hover:bg-teal-800"
           >
-            <Megaphone size={16} />
             <span>
-              Report an Issue /
-              <br />
-              Citizen Access
+              Get started
             </span>
+            <ArrowRight size={16} />
           </Link>
 
           {/* <Link

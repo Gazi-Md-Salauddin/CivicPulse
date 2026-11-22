@@ -14,44 +14,47 @@ import {
   Globe2,
 } from "lucide-react";
 import { useState } from "react";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const router = useRouter()
 
-  const handleLogin = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setError("");
+    setLoading(true);
+
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        }
-      );
+      const { data, error } = await authClient.signIn.email({
+        email: formData.email,
+        password: formData.password,
+      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+      if (error) {
+        setError(error.message ?? "Registration failed.");
+        return;
       }
 
       console.log("Login successful:", data);
 
-      window.location.href = "/";
-    } catch (error) {
-      console.error(error);
+      router.push("/");
+      router.refresh();
+
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -175,7 +178,7 @@ export default function LoginPage() {
                 </p>
 
                 <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
-                  Registration to CivicPulse
+                  Sign In to CivicPulse
                 </h2>
 
                 <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -184,31 +187,10 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              {/* Account Type */}
-              <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-1">
-                <div className="grid grid-cols-2 gap-1">
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-2 rounded-lg bg-white px-2 py-3 text-xs font-bold text-[#0F766E] shadow-sm"
-                  >
-                    <Users size={15} />
-                    Citizen
-                  </button>
-
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-2 rounded-lg px-2 py-3 text-xs font-semibold text-slate-500 transition hover:bg-white"
-                  >
-                    <Building2 size={15} />
-                    Municipal Staff
-                  </button>
-                </div>
-              </div>
-
               {/* Form */}
               <form className="space-y-5" onSubmit={handleLogin}>
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-slate-700">
+                  <label className="mb-2 block text-md font-semibold text-slate-700">
                     Email Address
                   </label>
                   <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 transition focus-within:border-[#0F766E] focus-within:ring-2 focus-within:ring-teal-50">
@@ -219,8 +201,10 @@ export default function LoginPage() {
                       placeholder="you@example.com"
                       autoComplete="email"
                       required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
                       className="h-12 w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
                     />
                   </div>
@@ -228,12 +212,12 @@ export default function LoginPage() {
 
                 <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <label className="text-xs font-semibold text-slate-700">
+                    <label className="text-md font-semibold text-slate-700">
                       Password
                     </label>
                     <Link
                       href="/forgot-password"
-                      className="text-[11px] font-semibold text-[#0F766E] hover:underline"
+                      className="text-sm font-semibold text-[#0F766E] hover:underline"
                     >
                       Forgot password?
                     </Link>
@@ -247,8 +231,10 @@ export default function LoginPage() {
                       placeholder="Enter your password"
                       autoComplete="current-password"
                       required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      value={formData.password}
+                      onChange={(e) =>
+                        setFormData({ ...formData, password: e.target.value })
+                      }
                       className="h-12 w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
                     />
                   </div>
@@ -269,12 +255,10 @@ export default function LoginPage() {
                   </span>
                 </div>
 
-                <button
-                  type="submit"
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F766E] text-sm font-bold text-white shadow-lg shadow-teal-900/10 transition hover:bg-[#115E59] active:scale-[0.99]"
-                >
-                  Sign In
-                  <ArrowRight size={17} />
+                <button type="submit" disabled={loading}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F766E] text-sm font-bold text-white transition hover:bg-[#115E59] disabled:cursor-not-allowed disabled:opacity-60">
+                  {loading ? "Signing in..." : "Sign In"}
+                  {!loading && <ArrowRight size={17} />}
                 </button>
               </form>
 
