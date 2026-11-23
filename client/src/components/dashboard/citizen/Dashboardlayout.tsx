@@ -175,60 +175,12 @@ export default function CitizenDashboard() {
             {/* Main Content */}
             <main className="min-h-screen">
 
-                {/* Topbar */}
-                <header className="sticky top-0  flex h-[82px] items-center justify-between border-b border-slate-200 bg-white px-5 sm:px-8">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setSidebarOpen(true)}
-                            className="rounded-lg p-2 hover:bg-slate-100 lg:hidden"
-                            aria-label="Open menu"
-                        >
-                            <Menu size={22} />
-                        </button>
-
-                        <div>
-                            <p className="text-xs text-slate-400">
-                                Citizen Portal / Overview
-                            </p>
-                            <h2 className="text-lg font-bold text-slate-800">
-                                Dashboard
-                            </h2>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <button
-                            aria-label="Notifications"
-                            className="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-teal-50 hover:text-[#0F766E]"
-                        >
-                            <Bell size={19} />
-                            <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-red-500" />
-                        </button>
-
-                        <div className="hidden items-center gap-3 border-l border-slate-200 pl-4 sm:flex">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-50 text-sm font-bold text-[#0F766E]">
-                                GS
-                            </div>
-
-                            <div>
-                                <p className="text-sm font-semibold">Citizen User</p>
-                                <p className="text-xs text-slate-400">
-                                    Dhaka, Bangladesh
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
                 {/* Dashboard Body */}
-                <div className="mx-auto max-w-[1500px] space-y-7 p-5 sm:p-8">
+                <div className="mx-auto container space-y-7 p-5 sm:p-8">
 
                     {/* Welcome Section */}
-                    <section className="flex flex-col justify-between gap-5 rounded-2xl bg-gradient-to-r from-[#134E4A] to-[#0F766E] p-6 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
+                    <section className="flex flex-col justify-between gap-5 rounded-2xl bg-linear-to-r from-[#134E4A] to-[#0F766E] p-6 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
                         <div>
-                            <p className="mb-2 text-sm font-medium text-teal-100/80">
-                                Sunday, November 22, 2026
-                            </p>
 
                             <h1 className="text-2xl font-bold sm:text-3xl">
                                 Welcome back, Citizen!
@@ -314,7 +266,7 @@ export default function CitizenDashboard() {
                             </div>
 
                             <a
-                                href="/citizen/reports"
+                                href="/dashboard/citizen/my-reports"
                                 className="inline-flex items-center gap-1 text-sm font-semibold text-[#0F766E] hover:text-[#134E4A]"
                             >
                                 View All Reports
@@ -410,10 +362,10 @@ export default function CitizenDashboard() {
                                             <td className="px-6 py-4">
                                                 <span
                                                     className={`text-xs font-semibold ${report.priority === "High"
-                                                            ? "text-red-600"
-                                                            : report.priority === "Medium"
-                                                                ? "text-amber-600"
-                                                                : "text-green-600"
+                                                        ? "text-red-600"
+                                                        : report.priority === "Medium"
+                                                            ? "text-amber-600"
+                                                            : "text-green-600"
                                                         }`}
                                                 >
                                                     {report.priority}

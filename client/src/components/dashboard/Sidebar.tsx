@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentType, SVGProps } from "react";
+import { type ComponentType, type SVGProps } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -15,6 +15,15 @@ import {
 } from "@gravity-ui/icons";
 
 import { Button, Drawer } from "@heroui/react";
+
+import {
+  ArrowUpRight,
+  ChevronRight,
+  HardHat,
+} from "lucide-react";
+
+
+// Types
 
 export type UserRole =
   | "citizen"
@@ -35,82 +44,371 @@ type NavItem = {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
-const navigation: Record<UserRole, NavItem[]> = {
-  citizen: [
-    { label: "Dashboard", href: "/dashboard/citizen", icon: House },
-    { label: "My Reports", href: "/dashboard/citizen/reports", icon: Envelope },
-    { label: "Create Issue", href: "/dashboard/citizen/create-issue", icon: Bell },
-    { label: "Nearby Issues", href: "/dashboard/citizen/nearby-issues", icon: Magnifier },
-    { label: "Notifications", href: "/dashboard/citizen/notifications", icon: Bell },
-    { label: "Profile", href: "/dashboard/citizen/profile", icon: Person },
-  ],
-
-  admin: [
-    { label: "Dashboard", href: "/dashboard/admin", icon: House },
-    { label: "Users", href: "/dashboard/admin/users", icon: Person },
-    { label: "Departments", href: "/dashboard/admin/departments", icon: House },
-    { label: "All Reports", href: "/dashboard/admin/reports", icon: Envelope },
-    { label: "Analytics", href: "/dashboard/admin/analytics", icon: Magnifier },
-    { label: "Settings", href: "/dashboard/admin/settings", icon: Gear },
-  ],
-
-  "department-manager": [
-    { label: "Dashboard", href: "/dashboard/manager", icon: House },
-    { label: "Department Issues", href: "/dashboard/manager/issues", icon: Envelope },
-    { label: "Assign Tasks", href: "/dashboard/manager/assign-tasks", icon: Bell },
-    { label: "Staff", href: "/dashboard/manager/staff", icon: Person },
-    { label: "Analytics", href: "/dashboard/manager/analytics", icon: Magnifier },
-  ],
-
-  "maintenance-staff": [
-    { label: "Dashboard", href: "/dashboard/staff", icon: House },
-    { label: "My Tasks", href: "/dashboard/staff/tasks", icon: Envelope },
-    { label: "Notifications", href: "/dashboard/staff/notifications", icon: Bell },
-    { label: "Profile", href: "/dashboard/staff/profile", icon: Person },
-  ],
+type NavSection = {
+  title: string;
+  items: NavItem[];
 };
 
-const roleLabels: Record<UserRole, string> = {
-  citizen: "Citizen Portal",
-  admin: "Admin Panel",
-  "department-manager": "Department Portal",
-  "maintenance-staff": "Staff Portal",
+type RoleConfig = {
+  portalName: string;
+  workspaceName: string;
+  workspaceDescription: string;
+  workspaceIcon: ComponentType<SVGProps<SVGSVGElement>>;
+  sections: NavSection[];
+  supportTitle: string;
+  supportDescription: string;
+  supportLink: string;
+  supportLinkLabel: string;
 };
 
-function NavigationItems({ role }: { role: UserRole }) {
+
+// Role Based Navigation Configuration
+
+const sidebarConfig: Record<UserRole, RoleConfig> = {
+  citizen: {
+    portalName: "Citizen Portal",
+    workspaceName: "Citizen Workspace",
+    workspaceDescription: "Community Member",
+    workspaceIcon: House,
+
+    sections: [
+      {
+        title: "Workspace",
+        items: [
+          {
+            label: "Dashboard",
+            href: "/dashboard/citizen",
+            icon: House,
+          },
+          {
+            label: "My Reports",
+            href: "/dashboard/citizen/my-reports",
+            icon: Envelope,
+          },
+          {
+            label: "Create Issue",
+            href: "/dashboard/citizen/create-issue",
+            icon: Bell,
+          },
+          {
+            label: "Nearby Issues",
+            href: "/dashboard/citizen/nearby-issues",
+            icon: Magnifier,
+          },
+          {
+            label: "Notifications",
+            href: "/dashboard/citizen/notifications",
+            icon: Bell,
+          },
+        ],
+      },
+      {
+        title: "Account",
+        items: [
+          {
+            label: "Profile",
+            href: "/dashboard/citizen/profile",
+            icon: Person,
+          },
+          {
+            label: "Settings",
+            href: "/dashboard/citizen/settings",
+            icon: Gear,
+          },
+        ],
+      },
+    ],
+
+    supportTitle: "Need assistance?",
+    supportDescription:
+      "Have questions or need help reporting a community issue?",
+    supportLink: "/contact",
+    supportLinkLabel: "Get Support",
+  },
+
+  admin: {
+    portalName: "Admin Panel",
+    workspaceName: "Admin Workspace",
+    workspaceDescription: "System Administrator",
+    workspaceIcon: ShieldCheckIcon,
+
+    sections: [
+      {
+        title: "Workspace",
+        items: [
+          {
+            label: "Dashboard",
+            href: "/dashboard/admin",
+            icon: House,
+          },
+          {
+            label: "Users",
+            href: "/dashboard/admin/users",
+            icon: Person,
+          },
+          {
+            label: "Departments",
+            href: "/dashboard/admin/departments",
+            icon: House,
+          },
+          {
+            label: "All Reports",
+            href: "/dashboard/admin/reports",
+            icon: Envelope,
+          },
+          {
+            label: "Analytics",
+            href: "/dashboard/admin/analytics",
+            icon: Magnifier,
+          },
+        ],
+      },
+      {
+        title: "Account",
+        items: [
+          {
+            label: "Settings",
+            href: "/dashboard/admin/settings",
+            icon: Gear,
+          },
+          {
+            label: "Profile",
+            href: "/dashboard/admin/profile",
+            icon: Person,
+          },
+        ],
+      },
+    ],
+
+    supportTitle: "System Support",
+    supportDescription:
+      "Manage your platform and get assistance when needed.",
+    supportLink: "/contact",
+    supportLinkLabel: "Get Support",
+  },
+
+  "department-manager": {
+    portalName: "Department Portal",
+    workspaceName: "Manager Workspace",
+    workspaceDescription: "Department Manager",
+    workspaceIcon: Gear,
+
+    sections: [
+      {
+        title: "Workspace",
+        items: [
+          {
+            label: "Dashboard",
+            href: "/dashboard/department-manager",
+            icon: House,
+          },
+          {
+            label: "Department Issues",
+            href: "/dashboard/department-manager/issues",
+            icon: Envelope,
+          },
+          {
+            label: "Assign Tasks",
+            href: "/dashboard/department-manager/assign-tasks",
+            icon: Bell,
+          },
+          {
+            label: "Staff",
+            href: "/dashboard/department-manager/staff",
+            icon: Person,
+          },
+          {
+            label: "Analytics",
+            href: "/dashboard/department-manager/analytics",
+            icon: Magnifier,
+          },
+        ],
+      },
+      {
+        title: "Account",
+        items: [
+          {
+            label: "Profile",
+            href: "/dashboard/department-manager/profile",
+            icon: Person,
+          },
+          {
+            label: "Settings",
+            href: "/dashboard/department-manager/settings",
+            icon: Gear,
+          },
+        ],
+      },
+    ],
+
+    supportTitle: "Manager Support",
+    supportDescription:
+      "Need help managing your department and maintenance team?",
+    supportLink: "/contact",
+    supportLinkLabel: "Get Support",
+  },
+
+  "maintenance-staff": {
+    portalName: "Staff Portal",
+    workspaceName: "Staff Workspace",
+    workspaceDescription: "Maintenance Team",
+    workspaceIcon: HardHat,
+
+    sections: [
+      {
+        title: "Workspace",
+        items: [
+          {
+            label: "Dashboard",
+            href: "/dashboard/maintenance-staff",
+            icon: House,
+          },
+          {
+            label: "My Tasks",
+            href: "/dashboard/staff/tasks",
+            icon: Envelope,
+          },
+          {
+            label: "In Progress",
+            href: "/dashboard/staff/in-progress",
+            icon: Bell,
+          },
+          {
+            label: "Completed Tasks",
+            href: "/dashboard/staff/completed",
+            icon: House,
+          },
+          {
+            label: "My Schedule",
+            href: "/dashboard/staff/schedule",
+            icon: Magnifier,
+          },
+          {
+            label: "Notifications",
+            href: "/dashboard/staff/notifications",
+            icon: Bell,
+          },
+        ],
+      },
+      {
+        title: "Account",
+        items: [
+          {
+            label: "Profile",
+            href: "/dashboard/staff/profile",
+            icon: Person,
+          },
+          {
+            label: "Settings",
+            href: "/dashboard/staff/settings",
+            icon: Gear,
+          },
+        ],
+      },
+    ],
+
+    supportTitle: "Need assistance?",
+    supportDescription:
+      "Contact your department manager for task-related support.",
+    supportLink: "/contact",
+    supportLinkLabel: "Get Support",
+  },
+};
+
+
+// Admin Icon
+
+function ShieldCheckIcon(props: SVGProps<SVGSVGElement>) {
+  return <HardHat {...props} />;
+}
+
+// Navigation Items
+
+
+function NavigationItems({
+  role,
+  onNavigate,
+}: {
+  role: UserRole;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
+  const config = sidebarConfig[role];
+
+  // Flatten all navigation items
+  const allItems = config.sections.flatMap(
+    (section) => section.items
+  );
+
+  // Find the most specific matching route.
+  // This prevents parent and child menus being active together.
+  const activeItem = allItems
+    .filter(
+      (item) =>
+        pathname === item.href ||
+        pathname.startsWith(`${item.href}/`)
+    )
+    .sort((a, b) => b.href.length - a.href.length)[0];
+
   return (
-    <nav className="flex flex-col gap-1">
-      {navigation[role].map((item) => {
-        const Icon = item.icon;
+    <nav className="flex flex-col gap-6">
+      {config.sections.map((section) => (
+        <div key={section.title}>
+          <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[1.5px] text-teal-300">
+            {section.title}
+          </p>
 
-        const isActive =
-          pathname === item.href ||
-          (item.href !== `/${role}/dashboard` &&
-            pathname.startsWith(`${item.href}/`));
+          <div className="flex flex-col gap-1">
+            {section.items.map((item) => {
+              const Icon = item.icon;
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
-              isActive
-                ? "bg-[#14B8A6] text-white"
-                : "text-teal-100 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            <Icon className="size-5 shrink-0" />
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
+              const isActive =
+                activeItem?.href === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-[#14B8A6] text-white shadow-sm"
+                      : "text-teal-100 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Icon className="size-5 shrink-0" />
+
+                  <span>{item.label}</span>
+
+                  {isActive && (
+                    <ChevronRight
+                      size={16}
+                      className="ml-auto"
+                    />
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 }
 
-export default function Sidebar({ role, mode }: SidebarProps) {
+// Main Sidebar Component
+
+export default function Sidebar({
+  role,
+  mode,
+}: SidebarProps) {
+  const config = sidebarConfig[role];
+
+  const WorkspaceIcon = config.workspaceIcon;
+
   // Mobile Drawer
+
   if (mode === "mobile") {
     return (
       <div className="lg:hidden">
@@ -126,9 +424,12 @@ export default function Sidebar({ role, mode }: SidebarProps) {
                 <Drawer.CloseTrigger />
 
                 <Drawer.Header>
-                  <Drawer.Heading>CivicPulse</Drawer.Heading>
+                  <Drawer.Heading>
+                    CivicPulse
+                  </Drawer.Heading>
+
                   <p className="text-sm text-muted">
-                    {roleLabels[role]}
+                    {config.portalName}
                   </p>
                 </Drawer.Header>
 
@@ -143,37 +444,55 @@ export default function Sidebar({ role, mode }: SidebarProps) {
     );
   }
 
+
   // Desktop Sidebar
+
   return (
-    <aside className="top-[2px] hidden h-screen w-[260px] shrink-0 flex-col bg-[#134E4A] text-white lg:flex">
-      {/* Logo */}
-      <div className="border-b border-white/10 px-6 py-6">
-        <Link href={`/dashboard/${role}`}>
-          <h2 className="text-xl font-bold">CivicPulse</h2>
-          <p className="mt-1 text-xs text-teal-200">
-            {roleLabels[role]}
+    <aside className="hidden w-64 shrink-0 bg-[#134E4A] p-4 lg:sticky lg:top-16 lg:block lg:h-[calc(100vh-4rem)] lg:self-start">
+      <div className="flex h-full flex-col">
+
+        {/* Workspace Header */}
+        <div className="mb-7 rounded-xl bg-white/10 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#14B8A6] text-white">
+              <WorkspaceIcon className="size-5" />
+            </div>
+
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">
+                {config.workspaceName}
+              </p>
+
+              <p className="truncate text-xs text-teal-200">
+                {config.workspaceDescription}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Navigation */}
+        <div className="flex-1 overflow-y-auto">
+          <NavigationItems role={role} />
+        </div>
+
+        {/* Support Card */}
+        <div className="mt-5 rounded-xl border border-white/10 bg-white/5 p-4">
+          <p className="text-sm font-semibold text-white">
+            {config.supportTitle}
           </p>
-        </Link>
-      </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <p className="mb-4 px-3 text-xs font-semibold uppercase tracking-wider text-teal-300">
-          Main Menu
-        </p>
+          <p className="mt-1 text-xs leading-5 text-teal-200">
+            {config.supportDescription}
+          </p>
 
-        <NavigationItems role={role} />
-      </div>
-
-      {/* Bottom */}
-      <div className="border-t border-white/10 p-4">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-teal-100 transition hover:bg-red-500/20 hover:text-white"
-        >
-          <Gear className="size-5" />
-          Settings
-        </button>
+          <Link
+            href={config.supportLink}
+            className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-white transition hover:text-teal-200"
+          >
+            {config.supportLinkLabel}
+            <ArrowUpRight size={14} />
+          </Link>
+        </div>
       </div>
     </aside>
   );
