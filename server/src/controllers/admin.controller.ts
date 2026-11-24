@@ -15,27 +15,34 @@ export const createDepartmentController = async (
   res: Response
 ) => {
   try {
-    const { name, description, location } = req.body;
+    const { name, description } = req.body;
 
-    if (!name || !description || !location) {
+    if (!name || !description) {
       return res.status(400).json({
         success: false,
-        message: "Name, description and location are required.",
+        message: "Name and description are required.",
       });
     }
 
-    const department = await createDepartment(
-      name.trim(),
-      description.trim(),
-      location.trim()
-    );
+    const department = await createDepartment(name, description);
 
     return res.status(201).json({
       success: true,
       message: "Department created successfully.",
       data: department,
     });
+
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "DEPARTMENT_ALREADY_EXISTS"
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "Department with this name already exists.",
+      });
+    }
+
     console.error("Create Department Error:", error);
 
     return res.status(500).json({

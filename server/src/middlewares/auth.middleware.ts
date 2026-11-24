@@ -7,6 +7,7 @@ import type {
 
 import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../lib/auth.js";
+import pool from "../config/db.js";
 
 // Supported user roles
 export type UserRole =
@@ -29,13 +30,14 @@ declare global {
   }
 }
 
-// Check whether user is logged in
+// Check authentication and account status
 export const requireAuth: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
+    // 1. Verify Better Auth session
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
     });
@@ -47,7 +49,25 @@ export const requireAuth: RequestHandler = async (
       });
     }
 
-    // Store authenticated session for controllers
+    // 2. Check whether account is active
+    const userResult = await pool.query(
+      `SELECT is_active
+       FROM "user"
+       WHERE id = $1`,
+      [session.user.id]
+    );
+
+    if (
+      !userResult.rows[0] ||
+      userResult.rows[0].is_active !== true
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is deactivated.",
+      });
+    }
+
+    // 3. Store authenticated session
     res.locals.session = session;
 
     next();
