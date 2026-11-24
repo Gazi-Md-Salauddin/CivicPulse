@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -130,9 +129,6 @@ export default function Navbar() {
               <>
                 <ProfieDropdown />
               </>
-
-
-
             ) : (
               <div className="flex gap-2">
                 <Link

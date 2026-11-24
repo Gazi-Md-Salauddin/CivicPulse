@@ -23,17 +23,21 @@ export default function ProfieDropdown() {
 
   const dashboardLinks = {
     citizen: '/dashboard/citizen',
-    departmentManager: '/dashboard/department-manager',
-    maintenanceStaff: '/dashboard/maintenance-staff',
+    department_manager: '/dashboard/department-manager',
+    maintenance_staff: '/dashboard/maintenance-staff',
     admin: '/dashboard/admin'
   }
 
   const handleDashboard = () => {
-    const role = user?.role;
-    if (role && Object.prototype.hasOwnProperty.call(dashboardLinks, role)) {
-      router.push(dashboardLinks[role as keyof typeof dashboardLinks]);
-    }
-  };
+
+  const role = user?.role;
+
+  if (role && Object.prototype.hasOwnProperty.call(dashboardLinks, role)) {
+    router.push(dashboardLinks[role as keyof typeof dashboardLinks]);
+  } else {
+    console.error("Invalid or unsupported role:", role);
+  }
+};
 
 
   return (

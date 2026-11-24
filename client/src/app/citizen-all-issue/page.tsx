@@ -250,7 +250,7 @@ export default function AllIssuesPage() {
         <main className="min-h-screen bg-[#F5FAF9] text-gray-800">
             <section
                 id="all-issues"
-                className="mx-auto max-w-7xl px-5 py-12 lg:px-8 lg:py-16"
+                className="mx-auto container px-5 py-12 lg:px-8 lg:py-16"
             >
                 {/* Header */}
                 <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -572,11 +572,10 @@ export default function AllIssuesPage() {
                                 <button
                                     key={number}
                                     onClick={() => setPage(number)}
-                                    className={`h-9 min-w-9 rounded-lg px-3 text-sm font-semibold ${
-                                        page === number
+                                    className={`h-9 min-w-9 rounded-lg px-3 text-sm font-semibold ${page === number
                                             ? "bg-[#0F766E] text-white"
                                             : "border border-gray-200 text-gray-600 hover:bg-gray-50"
-                                    }`}
+                                        }`}
                                 >
                                     {number}
                                 </button>
