@@ -19,9 +19,14 @@ export const getIssues = async (): Promise<IIssueResponse> => {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/issue`, {
     method: "GET",
     credentials: "include",
+    headers: {
+        "Content-Type": "application/json",
+      },
   });
 
   const result = await response.json();
+
+  console.log(response)
 
   if (!response.ok) {
     throw new Error(result.message || "Failed to fetch issues");

@@ -54,6 +54,7 @@ export default function Navbar() {
       await signOut();
       setMobileMenuOpen(false);
       router.refresh();
+      router.push("/")
     } catch (error) {
       console.error("Sign out failed:", error);
     }
@@ -93,11 +94,10 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`rounded-md px-3 py-2 text-center text-[13px] font-medium leading-5 transition-all duration-200 ${
-                  isActive
+                className={`rounded-md px-3 py-2 text-center text-[13px] font-medium leading-5 transition-all duration-200 ${isActive
                     ? "bg-teal-700 text-white shadow-sm"
                     : "text-slate-700 hover:bg-slate-100 hover:text-teal-700"
-                }`}
+                  }`}
               >
                 {link.name}
               </Link>
@@ -109,11 +109,10 @@ export default function Navbar() {
         <div className="flex gap-2 items-center">
           <Link
             href="/incident-map"
-            className={`flex items-center gap-2 rounded-md px-3 py-3 text-[13px] font-semibold transition ${
-              isLinkActive("/incident-map")
+            className={`flex items-center gap-2 rounded-md px-3 py-3 text-[13px] font-semibold transition ${isLinkActive("/incident-map")
                 ? "bg-teal-700 text-white"
                 : "bg-blue-50 text-slate-800 hover:bg-blue-100"
-            }`}
+              }`}
           >
             <MapPinned
               size={15}
@@ -129,11 +128,11 @@ export default function Navbar() {
           {!isPending && (
             user ? (
               <>
-             <ProfieDropdown/>
+                <ProfieDropdown />
               </>
-             
-                
-              
+
+
+
             ) : (
               <div className="flex gap-2">
                 <Link
@@ -168,11 +167,10 @@ export default function Navbar() {
 
       {/* Mobile Navigation */}
       <div
-        className={`overflow-hidden border-t border-slate-100 bg-white transition-all duration-300 ease-in-out xl:hidden ${
-          mobileMenuOpen
+        className={`overflow-hidden border-t border-slate-100 bg-white transition-all duration-300 ease-in-out xl:hidden ${mobileMenuOpen
             ? "max-h-[750px] opacity-100"
             : "max-h-0 border-t-0 opacity-0"
-        }`}
+          }`}
       >
         <div className="space-y-2 px-4 py-4">
 
@@ -200,11 +198,10 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={handleNavigation}
-                className={`flex items-center justify-between rounded-md px-4 py-3 text-sm font-medium transition ${
-                  isActive
+                className={`flex items-center justify-between rounded-md px-4 py-3 text-sm font-medium transition ${isActive
                     ? "bg-teal-700 text-white"
                     : "text-slate-700 hover:bg-slate-100"
-                }`}
+                  }`}
               >
                 {link.name}
 
@@ -217,11 +214,10 @@ export default function Navbar() {
           <Link
             href="/incident-map"
             onClick={handleNavigation}
-            className={`flex items-center gap-3 rounded-md px-4 py-3 text-sm font-semibold transition ${
-              isLinkActive("/incident-map")
+            className={`flex items-center gap-3 rounded-md px-4 py-3 text-sm font-semibold transition ${isLinkActive("/incident-map")
                 ? "bg-teal-700 text-white"
                 : "bg-blue-50 text-slate-800"
-            }`}
+              }`}
           >
             <MapPinned size={18} />
             Live Incident Map
@@ -232,11 +228,11 @@ export default function Navbar() {
             user ? (
               <div className="space-y-2 pt-2">
                 <div className="rounded-md bg-slate-50 px-4 py-3">
-                  
+
                   <p className="truncate text-sm font-semibold text-slate-800">
                     {user.name}
                   </p>
-                  
+
                 </div>
 
                 <button

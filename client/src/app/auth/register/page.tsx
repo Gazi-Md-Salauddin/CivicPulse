@@ -19,11 +19,14 @@ import {
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { useState } from "react";
+import { userAc } from "better-auth/plugins/admin/access";
 
 const inputClass =
   "h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#0F766E] focus:ring-2 focus:ring-teal-50";
 
 export default function RegisterPage() {
+
+  const router = useRouter();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -56,9 +59,9 @@ export default function RegisterPage() {
         setError(error.message ?? "Registration failed.");
         return;
       }
-
-      // Registration successful
-      console.log("Registration successful!");
+      
+      router.refresh()
+      router.push("/")
 
     } catch (err) {
       setError("Something went wrong. Please try again.");

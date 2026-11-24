@@ -278,7 +278,7 @@ export default function MyReportsPage() {
           </div>
 
           <Link
-            href="/dashboard/citizen/create-issue"
+            href="/create-issue"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0F766E] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#115E59]"
           >
             <Plus size={18} />
