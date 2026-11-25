@@ -16,6 +16,7 @@ import maintenanceRoutes from "./routes/maintenance.route.js";
 import departmentRoutes from "./routes/admin.route.js";
 import managerDashboardRoutes from "./routes/manager.route.js";
 import adminUserRoutes from "./routes/adminUser.route.js";
+import adminIssueRoutes from "./routes/adminIssue.route.js";
 
 const app: Express = express();
 
@@ -44,6 +45,8 @@ app.use("/api/manager", managerDashboardRoutes);
 app.use("/api/admin/users", adminUserRoutes);
 
 app.use("/api/admin/departments", departmentRoutes);
+
+app.use("/api/admin/issues", adminIssueRoutes);
 
 // BetterAuth route
 app.all("/api/*splat", toNodeHandler(auth));

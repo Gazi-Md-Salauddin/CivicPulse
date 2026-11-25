@@ -7,7 +7,10 @@ import {
   updateAssignedIssueStatusController,
   addIssueWorkNoteController,
   getIssueWorkNotesController,
+  uploadCompletionPhotosController,
 } from "../controllers/maintenance.controller.js";
+import { updateProfileController } from "../controllers/profile.controller.js";
+import upload from "../middlewares/upload.middleware.js";
 
 import {
   requireAuth,
@@ -18,6 +21,12 @@ const router = Router();
 
 // All routes require maintenance staff authentication
 router.use(requireAuth, requireMaintenanceStaff);
+
+router.patch(
+  "/profile",
+  upload.single("image"),
+  updateProfileController
+);
 
 // Dashboard
 router.get(
@@ -53,6 +62,12 @@ router.post(
 router.get(
   "/issues/:id/notes",
   getIssueWorkNotesController
+);
+
+router.post(
+  "/issues/:id/completion-photos",
+  upload.array("photos", 5),
+  uploadCompletionPhotosController
 );
 
 export default router;

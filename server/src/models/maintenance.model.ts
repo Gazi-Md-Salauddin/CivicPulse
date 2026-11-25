@@ -1,4 +1,13 @@
 import pool from "../config/db.js";
+import {
+  getIssueWorkflowSchemaFeatures,
+  insertIssueStatusHistory,
+  IssueWorkflowError,
+  requireWorkflowFeature,
+  validateIssueTransition,
+  withTransaction,
+  type IssueStatus,
+} from "../lib/issueWorkflow.js";
 
 // Dashboard statistics
 export const getMaintenanceDashboard = async (staffId: string) => {
@@ -22,6 +31,13 @@ export const getMaintenanceDashboard = async (staffId: string) => {
 
     JOIN reportissues ri
       ON ri.id = ia.issue_id
+    JOIN issue_category_departments icd
+      ON LOWER(REPLACE(TRIM(icd.category), ' ', '_')) =
+         LOWER(TRIM(ri.category))
+    JOIN department_staff_members dsm
+      ON dsm.department_id = icd.department_id
+     AND dsm.staff_id = ia.staff_id
+     AND dsm.is_active IS TRUE
 
     WHERE ia.staff_id = $1`,
     [staffId]
@@ -43,6 +59,13 @@ export const getAssignedIssues = async (staffId: string) => {
 
     JOIN reportissues ri
       ON ri.id = ia.issue_id
+    JOIN issue_category_departments icd
+      ON LOWER(REPLACE(TRIM(icd.category), ' ', '_')) =
+         LOWER(TRIM(ri.category))
+    JOIN department_staff_members dsm
+      ON dsm.department_id = icd.department_id
+     AND dsm.staff_id = ia.staff_id
+     AND dsm.is_active IS TRUE
 
     WHERE ia.staff_id = $1
 
@@ -69,6 +92,13 @@ export const getAssignedIssueById = async (
 
     JOIN reportissues ri
       ON ri.id = ia.issue_id
+    JOIN issue_category_departments icd
+      ON LOWER(REPLACE(TRIM(icd.category), ' ', '_')) =
+         LOWER(TRIM(ri.category))
+    JOIN department_staff_members dsm
+      ON dsm.department_id = icd.department_id
+     AND dsm.staff_id = ia.staff_id
+     AND dsm.is_active IS TRUE
 
     WHERE ri.id = $1
       AND ia.staff_id = $2
@@ -80,34 +110,110 @@ export const getAssignedIssueById = async (
   return result.rows[0] || null;
 };
 
+export const getAssignedIssueDetails = async (
+  issueId: string,
+  staffId: string
+) => {
+  const issue = await getAssignedIssueById(issueId, staffId);
+
+  if (!issue) {
+    return null;
+  }
+
+  const workflowSchema = await getIssueWorkflowSchemaFeatures();
+  const [historyResult, photosResult] = await Promise.all([
+    workflowSchema.statusHistoryAvailable
+      ? pool.query(
+          `SELECT
+             id,
+             previous_status,
+             new_status,
+             public_message,
+             created_at
+           FROM issue_status_history
+           WHERE issue_id = $1
+           ORDER BY created_at ASC, id ASC`,
+          [issueId]
+        )
+      : Promise.resolve({ rows: [] }),
+    workflowSchema.completionPhotosAvailable
+      ? pool.query(
+          `SELECT
+             id,
+             image_url,
+             mime_type,
+             file_size_bytes,
+             created_at
+           FROM issue_completion_photos
+           WHERE issue_id = $1
+           ORDER BY created_at DESC`,
+          [issueId]
+        )
+      : Promise.resolve({ rows: [] }),
+  ]);
+
+  return {
+    ...issue,
+    status_history: historyResult.rows,
+    completion_photos: photosResult.rows,
+  };
+};
 
 // Update issue status
 export const updateAssignedIssueStatus = async (
   issueId: string,
   staffId: string,
-  status: string
+  status: IssueStatus
 ) => {
-  const result = await pool.query(
-    `UPDATE reportissues ri
+  const workflowSchema = await getIssueWorkflowSchemaFeatures();
+  requireWorkflowFeature(workflowSchema.statusHistoryAvailable, "status history");
 
-    SET
-      status = $1,
-      updated_at = NOW()
+  return withTransaction(async (client) => {
+    const issueResult = await client.query(
+      `SELECT ri.id, ri.status
+       FROM reportissues ri
+       INNER JOIN issue_assignments ia ON ia.issue_id = ri.id
+       INNER JOIN issue_category_departments icd
+         ON LOWER(REPLACE(TRIM(icd.category), ' ', '_')) =
+            LOWER(TRIM(ri.category))
+       INNER JOIN department_staff_members dsm
+         ON dsm.department_id = icd.department_id
+        AND dsm.staff_id = ia.staff_id
+        AND dsm.is_active IS TRUE
+       WHERE ri.id = $1
+         AND ia.staff_id = $2
+       FOR UPDATE OF ri, dsm`,
+      [issueId, staffId]
+    );
 
-    WHERE ri.id = $2
+    const issue = issueResult.rows[0];
 
-      AND EXISTS (
-        SELECT 1
-        FROM issue_assignments ia
-        WHERE ia.issue_id = ri.id
-          AND ia.staff_id = $3
-      )
+    if (!issue) {
+      throw new IssueWorkflowError(
+        "Assigned issue not found.",
+        404
+      );
+    }
 
-    RETURNING ri.*`,
-    [status, issueId, staffId]
-  );
+    validateIssueTransition(issue.status, status);
 
-  return result.rows[0] || null;
+    const result = await client.query(
+      `UPDATE reportissues
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [status, issueId]
+    );
+
+    await insertIssueStatusHistory(client, {
+      issueId,
+      previousStatus: issue.status,
+      newStatus: status,
+      changedBy: staffId,
+    });
+
+    return result.rows[0];
+  });
 };
 
 
@@ -117,27 +223,133 @@ export const addIssueWorkNote = async (
   staffId: string,
   note: string
 ) => {
-  const result = await pool.query(
-    `INSERT INTO issue_work_notes (
-      issue_id,
-      staff_id,
-      note
-    )
+  return withTransaction(async (client) => {
+    const issueResult = await client.query(
+      `SELECT ri.status
+       FROM reportissues ri
+       INNER JOIN issue_assignments ia ON ia.issue_id = ri.id
+       INNER JOIN issue_category_departments icd
+         ON LOWER(REPLACE(TRIM(icd.category), ' ', '_')) =
+            LOWER(TRIM(ri.category))
+       INNER JOIN department_staff_members dsm
+         ON dsm.department_id = icd.department_id
+        AND dsm.staff_id = ia.staff_id
+        AND dsm.is_active IS TRUE
+       WHERE ri.id = $1
+         AND ia.staff_id = $2
+       FOR UPDATE OF ri, dsm`,
+      [issueId, staffId]
+    );
 
-    SELECT $1, $2, $3
+    const issue = issueResult.rows[0];
 
-    WHERE EXISTS (
-      SELECT 1
-      FROM issue_assignments
-      WHERE issue_id = $1
-        AND staff_id = $2
-    )
+    if (!issue) {
+      throw new IssueWorkflowError(
+        "Assigned issue not found.",
+        404
+      );
+    }
 
-    RETURNING *`,
-    [issueId, staffId, note]
+    if (issue.status !== "assigned" && issue.status !== "in_progress") {
+      throw new IssueWorkflowError(
+        "Work notes can only be added to active tasks.",
+        409
+      );
+    }
+
+    const result = await client.query(
+      `INSERT INTO issue_work_notes (issue_id, staff_id, note)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [issueId, staffId, note]
+    );
+
+    return result.rows[0];
+  });
+};
+
+export interface CompletionPhotoInput {
+  imageUrl: string;
+  publicId: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  fileSizeBytes: number;
+}
+
+export const saveCompletionPhotos = async (
+  issueId: string,
+  staffId: string,
+  photos: CompletionPhotoInput[]
+) => {
+  const workflowSchema = await getIssueWorkflowSchemaFeatures();
+  requireWorkflowFeature(
+    workflowSchema.completionPhotosAvailable,
+    "completion photo storage"
   );
 
-  return result.rows[0] || null;
+  return withTransaction(async (client) => {
+    const issueResult = await client.query(
+      `SELECT ri.status
+       FROM reportissues ri
+       INNER JOIN issue_assignments ia ON ia.issue_id = ri.id
+       INNER JOIN issue_category_departments icd
+         ON LOWER(REPLACE(TRIM(icd.category), ' ', '_')) =
+            LOWER(TRIM(ri.category))
+       INNER JOIN department_staff_members dsm
+         ON dsm.department_id = icd.department_id
+        AND dsm.staff_id = ia.staff_id
+        AND dsm.is_active IS TRUE
+       WHERE ri.id = $1
+         AND ia.staff_id = $2
+       FOR UPDATE OF ri, dsm`,
+      [issueId, staffId]
+    );
+
+    const issue = issueResult.rows[0];
+
+    if (!issue) {
+      throw new IssueWorkflowError(
+        "Assigned issue not found.",
+        404
+      );
+    }
+
+    if (issue.status !== "in_progress" && issue.status !== "resolved") {
+      throw new IssueWorkflowError(
+        "Completion photos can only be uploaded to active or resolved tasks.",
+        409
+      );
+    }
+
+    const savedPhotos = [];
+
+    for (const photo of photos) {
+      const result = await client.query(
+        `INSERT INTO issue_completion_photos (
+           issue_id,
+           uploaded_by,
+           image_url,
+           public_id,
+           mime_type,
+           file_size_bytes
+         )
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, issue_id, image_url, mime_type,
+                   file_size_bytes, created_at`,
+        [
+          issueId,
+          staffId,
+          photo.imageUrl,
+          photo.publicId,
+          photo.mimeType,
+          photo.fileSizeBytes,
+        ]
+      );
+
+      savedPhotos.push(result.rows[0]);
+    }
+
+    return savedPhotos;
+  });
 };
 
 
@@ -165,6 +377,14 @@ export const getIssueWorkNotes = async (
       AND EXISTS (
         SELECT 1
         FROM issue_assignments ia
+        INNER JOIN reportissues ri ON ri.id = ia.issue_id
+        INNER JOIN issue_category_departments icd
+          ON LOWER(REPLACE(TRIM(icd.category), ' ', '_')) =
+             LOWER(TRIM(ri.category))
+        INNER JOIN department_staff_members dsm
+          ON dsm.department_id = icd.department_id
+         AND dsm.staff_id = ia.staff_id
+         AND dsm.is_active IS TRUE
         WHERE ia.issue_id = n.issue_id
           AND ia.staff_id = $2
       )

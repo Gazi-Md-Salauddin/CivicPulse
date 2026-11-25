@@ -1,43 +1,17 @@
 import type { Request, Response } from "express";
 
 import pool from "../config/db.js";
-import cloudinary from "../config/cloudinary.js";
-
-interface UploadedImage {
-    secure_url: string;
-    public_id: string;
-}
-
-const uploadToCloudinary = (
-    buffer: Buffer
-): Promise<UploadedImage> => {
-    return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-            {
-                folder: "civicpulse/issues",
-                resource_type: "image",
-            },
-            (error, result) => {
-                if (error || !result) {
-                    return reject(error || new Error("Upload failed"));
-                }
-
-                resolve({
-                    secure_url: result.secure_url,
-                    public_id: result.public_id,
-                });
-            }
-        );
-
-        stream.end(buffer);
-    });
-};
+import {
+    deleteCloudinaryImages,
+    uploadImageBuffer,
+    type CloudinaryImage,
+} from "../lib/cloudinaryImages.js";
 
 export const uploadIssueImages = async (
     req: Request,
     res: Response
 ) => {
-    const uploadedImages: UploadedImage[] = [];
+    const uploadedImages: CloudinaryImage[] = [];
 
     try {
         const userId = res.locals.session.user.id;
@@ -70,7 +44,10 @@ export const uploadIssueImages = async (
         for (const file of files) {
             const buffer = file.buffer;
 
-            const image = await uploadToCloudinary(buffer);
+            const image = await uploadImageBuffer(
+                buffer,
+                "civicpulse/issues"
+            );
 
             uploadedImages.push(image);
         }
@@ -132,10 +109,8 @@ export const uploadIssueImages = async (
         console.error("Issue image upload error:", error);
 
         // Cleanup uploaded Cloudinary images if DB operation fails
-        await Promise.allSettled(
-            uploadedImages.map((image) =>
-                cloudinary.uploader.destroy(image.public_id)
-            )
+        await deleteCloudinaryImages(
+        uploadedImages.map((image) => image.public_id)
         );
 
         return res.status(500).json({
