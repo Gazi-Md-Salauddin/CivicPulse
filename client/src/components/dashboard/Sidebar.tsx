@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, type ComponentType, type SVGProps } from "react";
+import { Suspense, useState, type ComponentType, type SVGProps } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -11,9 +11,10 @@ import {
   Person,
 } from "@gravity-ui/icons";
 
-import { Button, Drawer } from "@heroui/react";
+import { Drawer } from "@heroui/react";
 
 import {
+  Building2,
   ChevronRight,
   ClipboardList,
   HardHat,
@@ -127,7 +128,7 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
           {
             label: "Departments",
             href: "/dashboard/admin/departments",
-            icon: House,
+            icon: Building2,
           },
           {
             label: "Issue Management",
@@ -306,39 +307,62 @@ export default function Sidebar({
   mode,
 }: SidebarProps) {
   const config = sidebarConfig[role];
-
   const WorkspaceIcon = config.workspaceIcon;
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Mobile Drawer
 
   if (mode === "mobile") {
     return (
-      <div className="lg:hidden">
-        <Drawer>
-          <Button variant="secondary">
-            <Bars />
-            Menu
-          </Button>
+      <div className="w-full bg-[#134E4A] px-4 py-3 lg:hidden">
+        <Drawer isOpen={drawerOpen} onOpenChange={setDrawerOpen}>
+          <Drawer.Trigger className="flex h-10 items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-medium text-white transition hover:bg-white/15">
+            <Bars aria-hidden="true" />
+            <span>Menu</span>
+          </Drawer.Trigger>
 
           <Drawer.Backdrop>
-            <Drawer.Content placement="left">
-              <Drawer.Dialog>
-                <Drawer.CloseTrigger />
+            <Drawer.Content
+              placement="left"
+              className="max-w-[calc(100vw-1rem)] bg-white/10 text-white"
+            >
+              <Drawer.Dialog className="bg-[#134E4A]">
+                <Drawer.CloseTrigger aria-label="Close dashboard navigation" className="bg-white/10 text-white" />
 
-                <Drawer.Header>
-                  <Drawer.Heading>
-                    CivicPulse
-                  </Drawer.Heading>
-
-                  <p className="text-sm text-muted">
-                    {config.portalName}
-                  </p>
+                <Drawer.Header className="pr-12">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#134E4A] text-white">
+                      <WorkspaceIcon className="size-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <Drawer.Heading className="truncate text-white">
+                        {config.workspaceName}
+                      </Drawer.Heading>
+                      <p className="text-sm text-gray-400">
+                        {config.workspaceDescription}
+                      </p>
+                    </div>
+                  </div>
                 </Drawer.Header>
 
                 <Drawer.Body>
-                  <Suspense fallback={null}>
-                    <NavigationItems role={role} />
-                  </Suspense>
+                  <div className="flex min-h-full flex-col gap-6">
+                    <Suspense fallback={null}>
+                      <NavigationItems
+                        role={role}
+                        onNavigate={() => setDrawerOpen(false)}
+                      />
+                    </Suspense>
+
+                    <div className="mt-auto rounded-xl border border-white/10 bg-[#134E4A] p-4">
+                      <p className="text-sm font-semibold text-white">
+                        {config.supportTitle}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-teal-100">
+                        {config.supportDescription}
+                      </p>
+                    </div>
+                  </div>
                 </Drawer.Body>
               </Drawer.Dialog>
             </Drawer.Content>

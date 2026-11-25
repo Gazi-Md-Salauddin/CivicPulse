@@ -82,7 +82,7 @@ export default function Banner() {
             </Link>
 
             <Link
-              href="/city-workflows"
+              href="/city-workflow"
               className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-7 py-3.5 text-sm font-semibold text-slate-700 transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:text-teal-700 sm:w-auto"
             >
               Explore City Workflows

@@ -1,11 +1,15 @@
 import { signOut, useSession } from "@/lib/auth-client";
-import { ArrowRightFromSquare, Gear, Persons } from "@gravity-ui/icons";
+import { ArrowRightFromSquare } from "@gravity-ui/icons";
 import { Avatar, Dropdown, Label } from "@heroui/react";
 import { useRouter } from "next/navigation";
 
-export default function ProfieDropdown() {
+export default function ProfieDropdown({
+  onNavigate,
+}: {
+  onNavigate?: () => void;
+}) {
 
-  const { data: session, isPending } = useSession();
+  const { data: session } = useSession();
 
   const user = session?.user
 
@@ -13,6 +17,7 @@ export default function ProfieDropdown() {
 
   const handleSignOut = async () => {
     await signOut()
+    onNavigate?.()
     router.refresh()
   }
 
@@ -33,6 +38,7 @@ export default function ProfieDropdown() {
   const role = user?.role;
 
   if (role && Object.prototype.hasOwnProperty.call(dashboardLinks, role)) {
+    onNavigate?.()
     router.push(dashboardLinks[role as keyof typeof dashboardLinks]);
   } else {
     console.error("Invalid or unsupported role:", role);

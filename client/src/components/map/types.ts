@@ -24,7 +24,8 @@ export interface BaseMapProps {
 }
 
 export interface LocationPickerProps {
-  position: MapCoordinate;
+  position: MapCoordinate | null;
+  center: MapCoordinate;
   onChange: (coordinate: MapCoordinate) => void;
   zoom?: number;
   className?: string;

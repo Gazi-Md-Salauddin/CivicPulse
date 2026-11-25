@@ -32,6 +32,21 @@ const statuses = [
 const formatLabel = (value: string) =>
   value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+const getStatusColor = (status: string) => {
+  const colors: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-800 ring-amber-200",
+    submitted: "bg-amber-100 text-amber-800 ring-amber-200",
+    under_review: "bg-yellow-100 text-yellow-800 ring-yellow-200",
+    assigned: "bg-blue-100 text-blue-800 ring-blue-200",
+    in_progress: "bg-indigo-100 text-indigo-800 ring-indigo-200",
+    resolved: "bg-green-100 text-green-800 ring-green-200",
+    closed: "bg-gray-100 text-gray-700 ring-gray-200",
+    rejected: "bg-red-100 text-red-800 ring-red-200",
+  };
+
+  return colors[status.toLowerCase()] || "bg-gray-100 text-gray-700 ring-gray-200";
+};
+
 const formatDate = (value: string) =>
   new Date(value).toLocaleString("en-GB", {
     day: "2-digit",
@@ -282,7 +297,7 @@ export default function AdminIssueManagementPage() {
 
   return (
     <main className="min-h-screen bg-[#F5FAF9] p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto container space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-[#0F766E]">
@@ -436,7 +451,9 @@ export default function AdminIssueManagementPage() {
                         {issue.reporter_name || "Unknown"}
                       </td>
                       <td className="px-5 py-4">
-                        <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-[#0F766E]">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusColor(issue.status)}`}
+                        >
                           {formatLabel(issue.status)}
                         </span>
                       </td>

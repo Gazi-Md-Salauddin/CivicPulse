@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
+import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
 
 import {
   AlertCircle,
@@ -15,6 +15,7 @@ import {
   Lightbulb,
   MapPin,
   Navigation,
+  Search,
   Trash2,
   UploadCloud,
   Waves,
@@ -23,6 +24,31 @@ import {
 import { createIssue } from "@/services/issue.service";
 import type { ICreateIssue } from "@/types/issue.types";
 import { uploadIssueImages } from "@/services/issue-image.service";
+import LocationPicker from "@/components/map/LocationPicker";
+import type { MapCoordinate } from "@/components/map/types";
+import { isValidMapCoordinate } from "@/components/map/types";
+import {
+  searchIssueLocations,
+  type AddressSearchResult,
+} from "@/services/location.service";
+
+const initialMapView: MapCoordinate = { latitude: 0, longitude: 0 };
+
+function getCoordinatePair(
+  latitude: string,
+  longitude: string
+): MapCoordinate | null {
+  if (!latitude.trim() || !longitude.trim()) {
+    return null;
+  }
+
+  const coordinate = {
+    latitude: Number(latitude),
+    longitude: Number(longitude),
+  };
+
+  return isValidMapCoordinate(coordinate) ? coordinate : null;
+}
 
 // Issue Categories
 const categories = [
@@ -76,9 +102,27 @@ export default function CreateIssuePage() {
 
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
+  const [mapCenter, setMapCenter] = useState(initialMapView);
+  const [mapZoom, setMapZoom] = useState(2);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [addressQuery, setAddressQuery] = useState("");
+  const [addressResults, setAddressResults] = useState<AddressSearchResult[]>([]);
+  const [addressSearchLoading, setAddressSearchLoading] = useState(false);
+  const [addressSearchError, setAddressSearchError] = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const addressSearchAbortRef = useRef<AbortController | null>(null);
+  const selectedCoordinates = getCoordinatePair(latitude, longitude);
+
+  const setSelectedLocation = (coordinate: MapCoordinate) => {
+    setLatitude(String(coordinate.latitude));
+    setLongitude(String(coordinate.longitude));
+    setMapCenter(coordinate);
+    setLocationError("");
+    setError("");
+  };
 
   // Handle Image Selection
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -111,18 +155,28 @@ export default function CreateIssuePage() {
   // Get Current GPS Location
   const handleCurrentLocation = () => {
     if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
+      setLocationError("Geolocation is not supported by your browser.");
       return;
     }
 
-    setError("");
+    setLocationError("");
     setLocationLoading(true);
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLatitude(position.coords.latitude.toString());
-        setLongitude(position.coords.longitude.toString());
+        const coordinate = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
 
+        if (!isValidMapCoordinate(coordinate)) {
+          setLocationError("Your browser returned invalid coordinates.");
+          setLocationLoading(false);
+          return;
+        }
+
+        setSelectedLocation(coordinate);
+        setMapZoom(15);
         setLocationLoading(false);
       },
       (err) => {
@@ -130,19 +184,19 @@ export default function CreateIssuePage() {
 
         switch (err.code) {
           case err.PERMISSION_DENIED:
-            setError("Please allow location permission.");
+            setLocationError("Location permission was denied.");
             break;
 
           case err.POSITION_UNAVAILABLE:
-            setError("Your location is currently unavailable.");
+            setLocationError("Your current location is unavailable.");
             break;
 
           case err.TIMEOUT:
-            setError("Location request timed out.");
+            setLocationError("Location request timed out. Please try again.");
             break;
 
           default:
-            setError("Unable to get your current location.");
+            setLocationError("Unable to get your current location.");
         }
       },
       {
@@ -153,8 +207,106 @@ export default function CreateIssuePage() {
     );
   };
 
+  const handleAddressSearch = async () => {
+    const query = addressQuery.trim();
+
+    if (query.length < 3 || query.length > 200) {
+      setAddressSearchError("Enter an address between 3 and 200 characters.");
+      setAddressResults([]);
+      return;
+    }
+
+    addressSearchAbortRef.current?.abort();
+    const controller = new AbortController();
+    addressSearchAbortRef.current = controller;
+    setAddressSearchLoading(true);
+    setAddressSearchError("");
+    setAddressResults([]);
+
+    try {
+      const results = await searchIssueLocations(query, controller.signal);
+      setAddressResults(results);
+      if (results.length === 0) {
+        setAddressSearchError("No matching addresses were found.");
+      }
+    } catch (searchError) {
+      if (!controller.signal.aborted) {
+        setAddressSearchError(
+          searchError instanceof Error
+            ? searchError.message
+            : "Address search failed. Please try again."
+        );
+      }
+    } finally {
+      if (addressSearchAbortRef.current === controller) {
+        addressSearchAbortRef.current = null;
+        setAddressSearchLoading(false);
+      }
+    }
+  };
+
+  const handleAddressSearchKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void handleAddressSearch();
+    }
+  };
+
+  const handleAddressResultSelect = (result: AddressSearchResult) => {
+    setLocationAddress(result.displayName);
+    setSelectedLocation({
+      latitude: result.latitude,
+      longitude: result.longitude,
+    });
+    setMapZoom(15);
+    setAddressResults([]);
+    setAddressSearchError("");
+  };
+
+  const handleClearLocation = () => {
+    addressSearchAbortRef.current?.abort();
+    addressSearchAbortRef.current = null;
+    setLocationAddress("");
+    setAddressQuery("");
+    setAddressResults([]);
+    setAddressSearchLoading(false);
+    setAddressSearchError("");
+    setLocationError("");
+    setError("");
+    setLatitude("");
+    setLongitude("");
+    setMapCenter(initialMapView);
+    setMapZoom(2);
+  };
+
+  const handleCoordinateInput = (
+    nextLatitude: string,
+    nextLongitude: string
+  ) => {
+    setLatitude(nextLatitude);
+    setLongitude(nextLongitude);
+
+    if (!nextLatitude.trim() || !nextLongitude.trim()) {
+      return;
+    }
+
+    const coordinate = {
+      latitude: Number(nextLatitude),
+      longitude: Number(nextLongitude),
+    };
+
+    if (isValidMapCoordinate(coordinate)) {
+      setMapCenter(coordinate);
+      setMapZoom(15);
+    }
+  };
+
   // Clear Form
   const handleClearForm = (form: HTMLFormElement) => {
+    addressSearchAbortRef.current?.abort();
+    addressSearchAbortRef.current = null;
     form.reset();
 
     setCategory("");
@@ -165,6 +317,14 @@ export default function CreateIssuePage() {
 
     setLatitude("");
     setLongitude("");
+    setLocationAddress("");
+    setAddressQuery("");
+    setAddressResults([]);
+    setAddressSearchLoading(false);
+    setAddressSearchError("");
+    setLocationError("");
+    setMapCenter(initialMapView);
+    setMapZoom(2);
 
     setError("");
     setSuccess("");
@@ -190,31 +350,42 @@ export default function CreateIssuePage() {
       formData.get("description") || ""
     ).trim();
 
-    const locationAddress = String(
-      formData.get("location_address") || ""
-    ).trim();
+    const address = locationAddress.trim();
 
-    if (!title || !description || !locationAddress) {
+    if (!title || !description || !address) {
       setError("Please fill in all required fields.");
       return;
+    }
+
+    const hasLatitude = latitude.trim().length > 0;
+    const hasLongitude = longitude.trim().length > 0;
+
+    if (hasLatitude !== hasLongitude) {
+      setError("Provide both latitude and longitude, or clear the location.");
+      return;
+    }
+
+    let coordinates: MapCoordinate | undefined;
+    if (hasLatitude && hasLongitude) {
+      coordinates = {
+        latitude: Number(latitude),
+        longitude: Number(longitude),
+      };
+
+      if (!isValidMapCoordinate(coordinates)) {
+        setError("Please enter valid latitude and longitude values.");
+        return;
+      }
     }
 
     const issueData: ICreateIssue = {
       title,
       description,
       category: category as ICreateIssue["category"],
-      location_address: locationAddress,
-      latitude: latitude.trim() ? Number(latitude) : undefined,
-      longitude: longitude.trim() ? Number(longitude) : undefined,
+      location_address: address,
+      latitude: coordinates?.latitude,
+      longitude: coordinates?.longitude,
     };
-
-    if (
-      (latitude.trim() && !Number.isFinite(Number(latitude))) ||
-      (longitude.trim() && !Number.isFinite(Number(longitude)))
-    ) {
-      setError("Please enter valid GPS coordinates.");
-      return;
-    }
 
     try {
       setLoading(true);
@@ -552,34 +723,129 @@ export default function CreateIssuePage() {
                   name="location_address"
                   required
                   type="text"
+                  value={locationAddress}
+                  onChange={(event) => setLocationAddress(event.target.value)}
+                  maxLength={500}
                   placeholder="Enter street, area, city or nearby landmark"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3.5 pl-12 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-600/10"
                 />
               </div>
             </div>
 
-            {/* GPS */}
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            {/* Address search */}
+            <div className="space-y-3">
               <div>
                 <h3 className="text-sm font-semibold text-slate-700">
-                  GPS Coordinates
+                  Search for an address
                 </h3>
-
-                <p className="mt-1 text-xs text-slate-400">
-                  Pinpoint the exact location of the issue.
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  Search public addresses only. Search runs only when you press
+                  the button; there is no autocomplete.
+                  {" "}Search data ©{" "}
+                  <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    OpenStreetMap contributors
+                  </a>
+                  .
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={handleCurrentLocation}
-                disabled={locationLoading}
-                className="flex items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-xs font-semibold text-teal-800 transition hover:bg-teal-100 disabled:opacity-50"
-              >
-                <Navigation size={16} />
-                {locationLoading ? "Getting Location..." : "Use Current Location"}
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="search"
+                  value={addressQuery}
+                  onChange={(event) => {
+                    setAddressQuery(event.target.value);
+                    setAddressResults([]);
+                    setAddressSearchError("");
+                  }}
+                  onKeyDown={handleAddressSearchKeyDown}
+                  maxLength={200}
+                  placeholder="Search a street, area or landmark"
+                  aria-label="Search for a public address"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm outline-none transition focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-600/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleAddressSearch()}
+                  disabled={addressSearchLoading || addressQuery.trim().length < 3}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Search size={16} />
+                  {addressSearchLoading ? "Searching..." : "Search"}
+                </button>
+              </div>
+
+              {addressSearchError && (
+                <p className="text-sm text-red-700" role="alert">
+                  {addressSearchError}
+                </p>
+              )}
+
+              {addressResults.length > 0 && (
+                <ul className="max-h-56 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                  {addressResults.map((result, index) => (
+                    <li key={`${result.latitude}-${result.longitude}-${index}`}>
+                      <button
+                        type="button"
+                        onClick={() => handleAddressResultSelect(result)}
+                        className="w-full px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-teal-50 focus-visible:bg-teal-50 focus-visible:outline-none"
+                      >
+                        {result.displayName}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+
+            {/* GPS and location actions */}
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700">
+                  Select the issue location
+                </h3>
+
+                <p className="mt-1 text-xs text-slate-400">
+                  Click the map or drag the pin. GPS is optional.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={handleCurrentLocation}
+                  disabled={locationLoading}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-xs font-semibold text-teal-800 transition hover:bg-teal-100 disabled:opacity-50"
+                >
+                  <Navigation size={16} />
+                  {locationLoading ? "Getting Location..." : "Current Location"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearLocation}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  <Trash2 size={15} />
+                  Clear Location
+                </button>
+              </div>
+            </div>
+
+            {locationLoading && (
+              <p className="text-sm text-teal-800" role="status">
+                Waiting for your device location...
+              </p>
+            )}
+            {locationError && (
+              <p className="text-sm text-red-700" role="alert">
+                {locationError}
+              </p>
+            )}
 
             {/* Latitude & Longitude */}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -591,9 +857,13 @@ export default function CreateIssuePage() {
                 <input
                   type="number"
                   step="any"
+                  min="-90"
+                  max="90"
                   value={latitude}
-                  onChange={(e) => setLatitude(e.target.value)}
-                  placeholder="23.8103"
+                  onChange={(event) =>
+                    handleCoordinateInput(event.target.value, longitude)
+                  }
+                  placeholder="Select on map or use GPS"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
                 />
               </div>
@@ -606,33 +876,35 @@ export default function CreateIssuePage() {
                 <input
                   type="number"
                   step="any"
+                  min="-180"
+                  max="180"
                   value={longitude}
-                  onChange={(e) => setLongitude(e.target.value)}
-                  placeholder="90.4125"
+                  onChange={(event) =>
+                    handleCoordinateInput(latitude, event.target.value)
+                  }
+                  placeholder="Select on map or use GPS"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-600/10"
                 />
               </div>
             </div>
 
-            {/* Map Placeholder */}
-            <div className="relative flex min-h-52 flex-col items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
-              <div className="absolute inset-0 opacity-30">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#cbd5e1_1px,transparent_1px),linear-gradient(to_bottom,#cbd5e1_1px,transparent_1px)] bg-[size:32px_32px]" />
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-700">
+                  {selectedCoordinates
+                    ? `${selectedCoordinates.latitude.toFixed(6)}, ${selectedCoordinates.longitude.toFixed(6)}`
+                    : "No coordinates selected"}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Moving the pin does not automatically change the address.
+                </p>
               </div>
-
-              <div className="relative flex size-12 items-center justify-center rounded-full bg-teal-100 text-teal-700">
-                <MapPin size={24} />
-              </div>
-
-              <p className="relative mt-3 text-sm font-semibold text-slate-700">
-                Location Preview
-              </p>
-
-              <p className="relative mt-1 text-xs text-slate-400">
-                {latitude && longitude
-                  ? `${latitude}, ${longitude}`
-                  : "Map integration will be available here"}
-              </p>
+              <LocationPicker
+                position={selectedCoordinates}
+                center={mapCenter}
+                onChange={setSelectedLocation}
+                zoom={mapZoom}
+              />
             </div>
           </div>
         </section>

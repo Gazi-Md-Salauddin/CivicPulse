@@ -7,25 +7,21 @@ import {
   Menu,
   X,
   MapPinned,
-  Megaphone,
   ChevronDown,
   ArrowRight,
 } from "lucide-react";
-import { signOut, useSession } from "@/lib/auth-client";
-import { usePathname, useRouter } from "next/navigation";
+import { useSession } from "@/lib/auth-client";
+import { usePathname } from "next/navigation";
 import ProfieDropdown from "./ProfileDropdown";
 
 const navLinks = [
   { name: "Platform Overview", href: "/", short: "Platform Overview" },
   { name: "Citizen Reporting", href: "/citizen-all-issue" },
-  { name: "City Workflows", href: "/city-workflows" },
-  { name: "Live City Telemetry", href: "/live-city-telemetry" },
-  { name: "Security & Trust", href: "/security-trust" },
+  { name: "City Workflows", href: "/city-workflow" },
   { name: "FAQ", href: "/faq" },
 ];
 
 export default function Navbar() {
-  const router = useRouter();
   const pathname = usePathname();
 
   const { data: session, isPending } = useSession();
@@ -49,21 +45,9 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   };
 
-  // Sign out
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      setMobileMenuOpen(false);
-      router.refresh();
-      router.push("/")
-    } catch (error) {
-      console.error("Sign out failed:", error);
-    }
-  };
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white shadow-sm">
-      <nav className="container mx-auto flex min-h-18 items-center justify-between gap-4 px-4 lg:px-2">
+      <nav className="container mx-auto flex min-h-18 w-full min-w-0 items-center justify-between gap-4 px-4 lg:px-2">
 
         {/* Logo and Brand */}
         <Link
@@ -107,9 +91,9 @@ export default function Navbar() {
         </div>
 
         {/* Desktop Actions */}
-        <div className="flex gap-2 items-center">
+        <div className="hidden items-center gap-2 xl:flex">
           <Link
-            href="/incident-map"
+            href="/live-incident"
             className={`flex items-center gap-2 rounded-md px-3 py-3 text-[13px] font-semibold transition ${isLinkActive("/incident-map")
               ? "bg-teal-700 text-white"
               : "bg-blue-50 text-slate-800 hover:bg-blue-100"
@@ -118,7 +102,7 @@ export default function Navbar() {
             <MapPinned
               size={15}
               className={
-                isLinkActive("/incident-map")
+                isLinkActive("/live-incident")
                   ? "text-white"
                   : "text-teal-700"
               }
@@ -128,9 +112,9 @@ export default function Navbar() {
 
           {!isPending && (
             user ? (
-              <>
+              <div className="hidden xl:block">
                 <ProfieDropdown />
-              </>
+              </div>
             ) : (
               <div className="flex gap-2">
                 <Link
@@ -154,10 +138,12 @@ export default function Navbar() {
 
         {/* Mobile Menu Button */}
         <button
+          type="button"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-700 transition hover:bg-slate-100 xl:hidden"
           aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           aria-expanded={mobileMenuOpen}
+          aria-controls="civicpulse-mobile-navigation"
         >
           {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
@@ -165,27 +151,15 @@ export default function Navbar() {
 
       {/* Mobile Navigation */}
       <div
+        id="civicpulse-mobile-navigation"
+        aria-hidden={!mobileMenuOpen}
+        inert={!mobileMenuOpen}
         className={`overflow-hidden border-t border-slate-100 bg-white transition-all duration-300 ease-in-out xl:hidden ${mobileMenuOpen
           ? "max-h-[750px] opacity-100"
           : "max-h-0 border-t-0 opacity-0"
           }`}
       >
-        <div className="space-y-2 px-4 py-4">
-
-          {/* Mobile Branding */}
-          <div className="mb-3 flex items-center justify-between rounded-lg bg-slate-50 p-3">
-            <div>
-              <p className="text-sm font-bold text-slate-800">
-                CivicPulse
-              </p>
-
-              <p className="text-[10px] font-medium uppercase tracking-widest text-slate-500">
-                GovTech Platform
-              </p>
-            </div>
-
-            <Landmark size={24} className="text-teal-700" />
-          </div>
+        <nav aria-label="Mobile navigation" className="space-y-2 px-4 py-4">
 
           {/* Mobile Navigation Links */}
           {navLinks.map((link) => {
@@ -208,38 +182,22 @@ export default function Navbar() {
             );
           })}
 
-          {/* Live Incident Map */}
           <Link
-            href="/incident-map"
+            href="/live-incident"
             onClick={handleNavigation}
             className={`flex items-center gap-3 rounded-md px-4 py-3 text-sm font-semibold transition ${isLinkActive("/incident-map")
               ? "bg-teal-700 text-white"
-              : "bg-blue-50 text-slate-800"
+              : "bg-blue-50 text-slate-800 hover:bg-blue-100"
               }`}
           >
             <MapPinned size={18} />
-            Live Incident Map
+            Live Incident
           </Link>
 
           {/* Mobile Auth Actions */}
           {!isPending && (
             user ? (
-              <div className="space-y-2 pt-2">
-                <div className="rounded-md bg-slate-50 px-4 py-3">
-
-                  <p className="truncate text-sm font-semibold text-slate-800">
-                    {user.name}
-                  </p>
-
-                </div>
-
-                <button
-                  onClick={handleSignOut}
-                  className="w-full rounded-md bg-red-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-600"
-                >
-                  Sign Out
-                </button>
-              </div>
+              <ProfieDropdown onNavigate={handleNavigation} />
             ) : (
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <Link
@@ -260,17 +218,7 @@ export default function Navbar() {
               </div>
             )
           )}
-
-          {/* Citizen Access */}
-          <Link
-            href="/citizen-access"
-            onClick={handleNavigation}
-            className="flex items-center justify-center gap-2 rounded-md bg-teal-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-teal-800"
-          >
-            <Megaphone size={17} />
-            Report an Issue / Citizen Access
-          </Link>
-        </div>
+        </nav>
       </div>
     </header>
   );

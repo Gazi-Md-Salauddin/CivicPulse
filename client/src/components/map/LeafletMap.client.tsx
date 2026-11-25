@@ -35,6 +35,10 @@ function toLeafletPosition(coordinate: MapCoordinate): L.LatLngExpression {
   return [coordinate.latitude, coordinate.longitude];
 }
 
+function normalizeLongitude(longitude: number) {
+  return ((longitude + 180) % 360 + 360) % 360 - 180;
+}
+
 function MapViewport({
   center,
   zoom,
@@ -61,7 +65,7 @@ function MapClickHandler({
     click(event) {
       onSelectCoordinates?.({
         latitude: event.latlng.lat,
-        longitude: event.latlng.lng,
+        longitude: normalizeLongitude(event.latlng.lng),
       });
     },
   });
@@ -105,7 +109,7 @@ function MapShell({
           className="absolute left-3 right-3 top-3 z-[1000] rounded-lg border border-amber-300 bg-amber-50/95 px-3 py-2 text-xs text-amber-900 shadow-sm"
           role="status"
         >
-          Map tiles could not be loaded. Check your connection and try again.
+          Map tiles could not be loaded. Check your connection.
         </div>
       )}
     </div>
@@ -152,14 +156,20 @@ function IssueMarkerView({ issue }: IssueMarkerProps) {
 function DraggableLocationMarker({
   position,
   onChange,
-}: Pick<LocationPickerProps, "position" | "onChange">) {
+}: {
+  position: MapCoordinate;
+  onChange: LocationPickerProps["onChange"];
+}) {
   const handleDragEnd = (event: LeafletEvent) => {
     if (!(event.target instanceof L.Marker)) {
       return;
     }
 
     const location = event.target.getLatLng();
-    onChange({ latitude: location.lat, longitude: location.lng });
+    onChange({
+      latitude: location.lat,
+      longitude: normalizeLongitude(location.lng),
+    });
   };
 
   return (
@@ -176,22 +186,30 @@ function DraggableLocationMarker({
 
 export function LocationPickerView({
   position,
+  center,
   onChange,
   zoom,
   className,
 }: LocationPickerProps) {
-  if (!isValidMapCoordinate(position)) {
+  if (!isValidMapCoordinate(center)) {
     return <MapError message="Choose a valid location to display the map." className={className} />;
   }
 
+  const selectedPosition = isValidMapCoordinate(position) ? position : null;
+
   return (
     <MapShell
-      center={position}
+      center={selectedPosition ?? center}
       zoom={zoom}
       className={className}
       onSelectCoordinates={onChange}
     >
-      <DraggableLocationMarker position={position} onChange={onChange} />
+      {selectedPosition && (
+        <DraggableLocationMarker
+          position={selectedPosition}
+          onChange={onChange}
+        />
+      )}
     </MapShell>
   );
 }
