@@ -7,6 +7,8 @@ import {
 
 import {
   managerDashboardController,
+  managerIssuesController,
+  managerIssueDetailsController,
 } from "../controllers/manager.controller.js";
 
 const router = Router();
@@ -16,6 +18,22 @@ router.get(
   requireAuth,
   requireDepartmentManager,
   managerDashboardController
+);
+
+
+
+router.get(
+  "/departmentissues",
+  requireAuth,
+  requireDepartmentManager,
+  managerIssuesController
+);
+
+router.get(
+  "/departmentissues/:issueId",
+  requireAuth,
+  requireDepartmentManager,
+  managerIssueDetailsController
 );
 
 export default router;

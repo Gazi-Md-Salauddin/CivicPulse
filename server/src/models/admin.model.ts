@@ -88,7 +88,9 @@ export const assignDepartmentManager = async (
     const managerResult = await pool.query(
         `SELECT id, name, email
      FROM "user"
-     WHERE id = $1 AND role = 'department_manager'`,
+     WHERE id = $1
+       AND role = 'department_manager'
+       AND is_active IS TRUE`,
         [managerId]
     );
 

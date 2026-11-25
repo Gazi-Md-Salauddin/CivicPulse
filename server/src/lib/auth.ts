@@ -3,7 +3,7 @@ import pool from "../config/db.js";
 
 
 export const auth = betterAuth({
-  basePath: process.env.BETTER_AUTH_URL,
+  baseURL: process.env.BETTER_AUTH_URL,
 
   trustedOrigins: [
     process.env.NEXT_PUBLIC_URL || 'http://localhost:3000',
@@ -24,13 +24,14 @@ export const auth = betterAuth({
 
       role: {
         type: [
+          "admin",
           "citizen",
           "department_manager",
           "maintenance_staff",
         ],
         required: true,
         defaultValue: "citizen",
-        input: true,
+        input: false,
       },
     },
   },

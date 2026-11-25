@@ -1,7 +1,5 @@
 import type { Request, Response } from "express";
-import { fromNodeHeaders } from "better-auth/node";
 
-import { auth } from "../lib/auth.js";
 import pool from "../config/db.js";
 import cloudinary from "../config/cloudinary.js";
 
@@ -42,19 +40,7 @@ export const uploadIssueImages = async (
     const uploadedImages: UploadedImage[] = [];
 
     try {
-        // 1. Authenticate user
-        const session = await auth.api.getSession({
-            headers: fromNodeHeaders(req.headers),
-        });
-
-        if (!session) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized",
-            });
-        }
-
-        const userId = session.user.id;
+        const userId = res.locals.session.user.id;
         const { issueId } = req.params;
 
         const files = req.files as Express.Multer.File[];
