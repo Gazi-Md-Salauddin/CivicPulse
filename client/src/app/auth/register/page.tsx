@@ -5,12 +5,11 @@ import {
   ShieldCheck,
   User,
   Mail,
-  Phone,
   LockKeyhole,
   MapPin,
   Building2,
-  Landmark,
   Users,
+  Landmark,
   CheckCircle2,
   Activity,
   Globe2,
@@ -63,7 +62,7 @@ export default function RegisterPage() {
       router.refresh()
       router.push("/")
 
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);

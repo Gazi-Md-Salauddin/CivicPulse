@@ -11,19 +11,23 @@ import {
   X,
   CheckCircle2,
   XCircle,
-  Users,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
   Landmark,
 } from "lucide-react";
+import { apiUrl, parseApiResponse } from "@/services/api";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+};
 
 type Department = {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
   is_active: boolean;
   created_at: string;
   updated_at?: string;
@@ -65,24 +69,22 @@ export default function DepartmentManagementPage() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(
-        `${API_URL}/admin/departments`,
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
+      const response = await fetch(apiUrl("admin/departments"), {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
 
-      const result = await response.json();
+      const result =
+        await parseApiResponse<ApiResponse<Department[]>>(response);
 
-      if (!response.ok) {
+      if (!result.success) {
         throw new Error(
           result.message || "Failed to fetch departments"
         );
       }
 
-      setDepartments(result.data || []);
+      setDepartments(result.data);
     } catch (err) {
       setError(
         err instanceof Error
@@ -177,11 +179,11 @@ export default function DepartmentManagementPage() {
 
       const isEditing = Boolean(editingDepartment);
 
-      const url = isEditing
-        ? `${API_URL}/admin/departments/${editingDepartment!.id}`
-        : `${API_URL}/admin/departments`;
+      const endpoint = isEditing
+        ? `admin/departments/${editingDepartment!.id}`
+        : "admin/departments";
 
-      const response = await fetch(url, {
+      const response = await fetch(apiUrl(endpoint), {
         method: isEditing ? "PATCH" : "POST",
         credentials: "include",
         headers: {
@@ -193,9 +195,10 @@ export default function DepartmentManagementPage() {
         }),
       });
 
-      const result = await response.json();
+      const result =
+        await parseApiResponse<ApiResponse<Department>>(response);
 
-      if (!response.ok) {
+      if (!result.success) {
         throw new Error(
           result.message || "Department operation failed"
         );
@@ -225,7 +228,12 @@ export default function DepartmentManagementPage() {
 
   // Activate / deactivate department
   const handleToggleStatus = async (department: Department) => {
-    const action = department.is_active ? "deactivate" : "activate";
+    if (!department.is_active) {
+      setError("Department activation is not supported by the current API.");
+      return;
+    }
+
+    const action = "deactivate";
 
     const confirmed = window.confirm(
       `Are you sure you want to ${action} ${department.name}?`
@@ -239,22 +247,17 @@ export default function DepartmentManagementPage() {
       setSuccess("");
 
       const response = await fetch(
-        `${API_URL}/admin/departments/${department.id}/status`,
+        apiUrl(`admin/departments/${department.id}`),
         {
-          method: "PATCH",
+          method: "DELETE",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            is_active: !department.is_active,
-          }),
         }
       );
 
-      const result = await response.json();
+      const result =
+        await parseApiResponse<ApiResponse<Department>>(response);
 
-      if (!response.ok) {
+      if (!result.success) {
         throw new Error(
           result.message || "Failed to update department status"
         );
@@ -566,11 +569,14 @@ export default function DepartmentManagementPage() {
 
                           <button
                             onClick={() => handleToggleStatus(department)}
-                            disabled={actionId === department.id}
+                            disabled={
+                              actionId === department.id ||
+                              !department.is_active
+                            }
                             title={
                               department.is_active
                                 ? "Deactivate department"
-                                : "Activate department"
+                                : "Activation is not supported"
                             }
                             className={`flex h-9 w-9 items-center justify-center rounded-lg border transition disabled:opacity-50 ${
                               department.is_active

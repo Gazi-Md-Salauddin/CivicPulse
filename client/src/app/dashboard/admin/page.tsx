@@ -96,7 +96,9 @@ export default function DepartmentManagementPage() {
     return departments.filter((department) => {
       const matchesSearch =
         department.name.toLowerCase().includes(search.toLowerCase()) ||
-        department.location.toLowerCase().includes(search.toLowerCase());
+        (department.location ?? "")
+          .toLowerCase()
+          .includes(search.toLowerCase());
 
       const isActive = department.is_active !== false;
 
@@ -123,8 +125,8 @@ export default function DepartmentManagementPage() {
 
     setForm({
       name: department.name,
-      description: department.description,
-      location: department.location,
+      description: department.description ?? "",
+      location: department.location ?? "",
     });
 
     setModal("edit");

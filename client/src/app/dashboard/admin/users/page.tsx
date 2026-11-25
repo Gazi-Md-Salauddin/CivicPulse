@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiUrl, parseApiResponse } from "@/services/api";
 import {
   Search,
   Users,
@@ -51,14 +52,6 @@ type ApiResponse<T> = {
   pagination?: Pagination;
 };
 
-
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-)
-  .replace(/\/+$/, "")
-  .replace(/\/api$/, "");
-
-const USERS_API = `${API_BASE}/api/admin/users`;
 
 const roles: UserRole[] = [
   "admin",
@@ -129,7 +122,7 @@ export default function AdminUsersPage() {
       }
 
       const response = await fetch(
-        `${USERS_API}?${params.toString()}`,
+        `${apiUrl("admin/users")}?${params.toString()}`,
         {
           method: "GET",
           credentials: "include",
@@ -137,7 +130,8 @@ export default function AdminUsersPage() {
         }
       );
 
-      const result: ApiResponse<User[]> = await response.json();
+      const result =
+        await parseApiResponse<ApiResponse<User[]>>(response);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Failed to load users");
@@ -194,7 +188,7 @@ export default function AdminUsersPage() {
       setSuccess("");
 
       const response = await fetch(
-        `${USERS_API}/${userId}/role`,
+        apiUrl(`admin/users/${userId}/role`),
         {
           method: "PATCH",
           credentials: "include",
@@ -205,7 +199,7 @@ export default function AdminUsersPage() {
         }
       );
 
-      const result = await response.json();
+      const result = await parseApiResponse<ApiResponse<User>>(response);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Failed to update role");
@@ -242,14 +236,14 @@ export default function AdminUsersPage() {
       setSuccess("");
 
       const response = await fetch(
-        `${USERS_API}/${userId}/${action}`,
+        apiUrl(`admin/users/${userId}/${action}`),
         {
           method: "PATCH",
           credentials: "include",
         }
       );
 
-      const result = await response.json();
+      const result = await parseApiResponse<ApiResponse<User>>(response);
 
       if (!response.ok || !result.success) {
         throw new Error(
@@ -286,12 +280,12 @@ export default function AdminUsersPage() {
       setDetailsLoading(true);
       setError("");
 
-      const response = await fetch(`${USERS_API}/${userId}`, {
+      const response = await fetch(apiUrl(`admin/users/${userId}`), {
         credentials: "include",
         cache: "no-store",
       });
 
-      const result = await response.json();
+      const result = await parseApiResponse<ApiResponse<User>>(response);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Failed to get user");

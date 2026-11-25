@@ -29,6 +29,8 @@ export default function Navbar() {
   const pathname = usePathname();
 
   const { data: session, isPending } = useSession();
+
+
   const user = session?.user;
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -94,8 +96,8 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 className={`rounded-md px-3 py-2 text-center text-[13px] font-medium leading-5 transition-all duration-200 ${isActive
-                    ? "bg-teal-700 text-white shadow-sm"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-teal-700"
+                  ? "bg-teal-700 text-white shadow-sm"
+                  : "text-slate-700 hover:bg-slate-100 hover:text-teal-700"
                   }`}
               >
                 {link.name}
@@ -109,8 +111,8 @@ export default function Navbar() {
           <Link
             href="/incident-map"
             className={`flex items-center gap-2 rounded-md px-3 py-3 text-[13px] font-semibold transition ${isLinkActive("/incident-map")
-                ? "bg-teal-700 text-white"
-                : "bg-blue-50 text-slate-800 hover:bg-blue-100"
+              ? "bg-teal-700 text-white"
+              : "bg-blue-50 text-slate-800 hover:bg-blue-100"
               }`}
           >
             <MapPinned
@@ -164,8 +166,8 @@ export default function Navbar() {
       {/* Mobile Navigation */}
       <div
         className={`overflow-hidden border-t border-slate-100 bg-white transition-all duration-300 ease-in-out xl:hidden ${mobileMenuOpen
-            ? "max-h-[750px] opacity-100"
-            : "max-h-0 border-t-0 opacity-0"
+          ? "max-h-[750px] opacity-100"
+          : "max-h-0 border-t-0 opacity-0"
           }`}
       >
         <div className="space-y-2 px-4 py-4">
@@ -195,8 +197,8 @@ export default function Navbar() {
                 href={link.href}
                 onClick={handleNavigation}
                 className={`flex items-center justify-between rounded-md px-4 py-3 text-sm font-medium transition ${isActive
-                    ? "bg-teal-700 text-white"
-                    : "text-slate-700 hover:bg-slate-100"
+                  ? "bg-teal-700 text-white"
+                  : "text-slate-700 hover:bg-slate-100"
                   }`}
               >
                 {link.name}
@@ -211,8 +213,8 @@ export default function Navbar() {
             href="/incident-map"
             onClick={handleNavigation}
             className={`flex items-center gap-3 rounded-md px-4 py-3 text-sm font-semibold transition ${isLinkActive("/incident-map")
-                ? "bg-teal-700 text-white"
-                : "bg-blue-50 text-slate-800"
+              ? "bg-teal-700 text-white"
+              : "bg-blue-50 text-slate-800"
               }`}
           >
             <MapPinned size={18} />

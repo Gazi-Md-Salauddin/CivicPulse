@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { api, apiUrl, parseApiResponse } from "./api";
 import type {
   ICreateIssue,
   IIssueResponse,
@@ -16,43 +16,26 @@ export const createIssue = async (
 
 // Get citizen own issue
 export const getIssues = async (): Promise<IIssueResponse> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/issue`, {
+  const response = await fetch(apiUrl("issue"), {
     method: "GET",
     credentials: "include",
     headers: {
-        "Content-Type": "application/json",
-      },
+      "Content-Type": "application/json",
+    },
   });
 
-  const result = await response.json();
-
-  console.log(response)
-
-  if (!response.ok) {
-    throw new Error(result.message || "Failed to fetch issues");
-  }
-
-  return result;
+  return parseApiResponse<IIssueResponse>(response);
 };
 
 
 // Get all citizen issue
 export const getAllPublicIssues = async (): Promise<IGetIssuesResponse> => {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/public/issues`,
-    {
-      method: "GET",
-      cache: "no-store",
-    }
-  );
+  const response = await fetch(apiUrl("public/issues"), {
+    method: "GET",
+    cache: "no-store",
+  });
 
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || "Failed to fetch public issues");
-  }
-
-  return result;
+  return parseApiResponse<IGetIssuesResponse>(response);
 };
 
 
@@ -66,19 +49,10 @@ export interface IPublicIssueDetailsResponse {
 export const getPublicIssueById = async (
   id: string
 ): Promise<IPublicIssueDetailsResponse> => {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/public/issues/${id}`,
-    {
-      method: "GET",
-      cache: "no-store",
-    }
-  );
+  const response = await fetch(apiUrl(`public/issues/${id}`), {
+    method: "GET",
+    cache: "no-store",
+  });
 
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || "Failed to fetch issue details");
-  }
-
-  return result;
+  return parseApiResponse<IPublicIssueDetailsResponse>(response);
 };

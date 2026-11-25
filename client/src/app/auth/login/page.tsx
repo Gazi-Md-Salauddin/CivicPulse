@@ -260,19 +260,7 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              {/* Divider */}
-              <div className="my-7 flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-sm font-medium text-slate-400">
-                  SECURE MUNICIPAL ACCESS
-                </span>
-                <div className="h-px flex-1 bg-slate-200" />
-              </div>
 
-              <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 py-3 text-xs font-semibold text-slate-600">
-                <Globe2 size={16} className="text-[#0F766E]" />
-                Government Identity & SSO
-              </div>
 
               <p className="mt-8 text-center text-sm text-slate-500">
                 Don't have an account?{" "}

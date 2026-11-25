@@ -1,10 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+import { apiUrl, parseApiResponse } from "./api";
 
 export type Department = {
   id: string;
   name: string;
-  description: string;
-  location: string;
+  description: string | null;
+  location: string | null;
   is_active: boolean;
   manager_id?: string | null;
 };
@@ -15,8 +15,17 @@ export type DepartmentPayload = {
   location: string;
 };
 
-const request = async (endpoint: string, options: RequestInit = {}) => {
-  const response = await fetch(`${API_URL}/admin/departments${endpoint}`, {
+type DepartmentResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+};
+
+const request = async <T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> => {
+  const response = await fetch(apiUrl(`admin/departments${endpoint}`), {
     ...options,
     credentials: "include",
     headers: {
@@ -25,57 +34,31 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
     },
   });
 
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || "Something went wrong");
-  }
-
-  return result;
+  return parseApiResponse<T>(response);
 };
 
 // Get all departments
-export const getDepartments = async () => {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/admin/departments`,
-    {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || "Failed to fetch public issues");
-  }
-
-  return result;
-
-};
+export const getDepartments = () =>
+  request<DepartmentResponse<Department[]>>("");
 
 // Create department
-export const createDepartment = async (data: DepartmentPayload) => {
-  return request("", {
+export const createDepartment = (data: DepartmentPayload) => {
+  return request<DepartmentResponse<Department>>("", {
     method: "POST",
     body: JSON.stringify(data),
   });
 };
 
 // Get department details
-export const getDepartmentDetails = async (id: string) => {
-  return request(`/${id}`);
-};
+export const getDepartmentDetails = (id: string) =>
+  request<DepartmentResponse<Department>>(`/${id}`);
 
 // Update department
 export const updateDepartment = async (
   id: string,
   data: DepartmentPayload
 ) => {
-  return request(`/${id}`, {
+  return request<DepartmentResponse<Department>>(`/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -86,15 +69,15 @@ export const assignDepartmentManager = async (
   id: string,
   manager_id: string
 ) => {
-  return request(`/${id}/manager`, {
+  return request<DepartmentResponse<Department>>(`/${id}/manager`, {
     method: "PATCH",
     body: JSON.stringify({ manager_id }),
   });
 };
 
 // Deactivate department
-export const deactivateDepartment = async (id: string) => {
-  return request(`/${id}`, {
+export const deactivateDepartment = (id: string) => {
+  return request<DepartmentResponse<Department>>(`/${id}`, {
     method: "DELETE",
   });
 };

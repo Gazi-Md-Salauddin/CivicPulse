@@ -1,276 +1,327 @@
-
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { apiUrl, parseApiResponse } from "@/services/api";
 import {
   Activity,
   AlertCircle,
-  ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
   CalendarDays,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Clock3,
   ClipboardList,
   Filter,
   MapPin,
+  RefreshCw,
   Search,
   ShieldCheck,
   Users,
   Wrench,
 } from "lucide-react";
 
-type IssueStatus =
-  | "Submitted"
-  | "Under Review"
-  | "Assigned"
-  | "In Progress"
-  | "Resolved";
 
-type Priority = "Critical" | "High" | "Medium" | "Low";
+// Types
 
-type DepartmentIssue = {
-  id: string;
-  title: string;
-  category: string;
-  location: string;
-  priority: Priority;
-  status: IssueStatus;
-  reporter: string;
-  assignedTo: string | null;
-  date: string;
-};
-
-type StaffMember = {
+type Department = {
   id: string;
   name: string;
-  role: string;
+  description?: string | null;
+  location?: string | null;
+  status?: string;
+  manager_id?: string | null;
+};
+
+type Issue = {
+  id: string;
+  title: string;
+  description?: string;
+  category: string;
+  location_address?: string;
+  location?: string;
+  status: string;
+  reporter_name?: string;
+  reporter?: string;
+  assigned_staff_name?: string | null;
+  assignedTo?: string | null;
+  created_at?: string;
+  createdAt?: string;
+};
+
+type DashboardStats = {
+  totalIssues: number;
+  pendingIssues: number;
+  underReviewIssues: number;
+  inProgressIssues: number;
+  resolvedIssues: number;
+  closedIssues: number;
+  assignedStaffCount: number;
   activeTasks: number;
   completedTasks: number;
-  availability: "Available" | "Busy";
-  initials: string;
 };
 
-const initialIssues: DepartmentIssue[] = [
-  {
-    id: "CP-00124",
-    title: "Repair damaged road near Main Market",
-    category: "Road Damage",
-    location: "Mirpur 10, Dhaka",
-    priority: "Critical",
-    status: "In Progress",
-    reporter: "Rahim Ahmed",
-    assignedTo: "Abdullah Karim",
-    date: "23 Nov 2026",
-  },
-  {
-    id: "CP-00121",
-    title: "Streetlight not working",
-    category: "Streetlight",
-    location: "Uttara Sector 7, Dhaka",
-    priority: "High",
-    status: "Submitted",
-    reporter: "Nusrat Jahan",
-    assignedTo: null,
-    date: "22 Nov 2026",
-  },
-  {
-    id: "CP-00118",
-    title: "Blocked drainage system",
-    category: "Drainage",
-    location: "Dhanmondi 27, Dhaka",
-    priority: "High",
-    status: "Assigned",
-    reporter: "Sakib Hasan",
-    assignedTo: "Abdullah Karim",
-    date: "21 Nov 2026",
-  },
-  {
-    id: "CP-00115",
-    title: "Broken footpath tiles",
-    category: "Footpath",
-    location: "Mohammadpur, Dhaka",
-    priority: "Medium",
-    status: "Under Review",
-    reporter: "Farzana Akter",
-    assignedTo: null,
-    date: "20 Nov 2026",
-  },
-  {
-    id: "CP-00110",
-    title: "Garbage collection point cleanup",
-    category: "Waste Management",
-    location: "Banani, Dhaka",
-    priority: "Low",
-    status: "Resolved",
-    reporter: "Tanvir Hossain",
-    assignedTo: "Abdullah Karim",
-    date: "19 Nov 2026",
-  },
-];
-
-const initialStaff: StaffMember[] = [
-  {
-    id: "ST-001",
-    name: "Abdullah Karim",
-    role: "Field Technician",
-    activeTasks: 3,
-    completedTasks: 12,
-    availability: "Busy",
-    initials: "AK",
-  },
-  {
-    id: "ST-002",
-    name: "Mahmud Hasan",
-    role: "Maintenance Staff",
-    activeTasks: 1,
-    completedTasks: 9,
-    availability: "Available",
-    initials: "MH",
-  },
-  {
-    id: "ST-003",
-    name: "Sabbir Ahmed",
-    role: "Field Technician",
-    activeTasks: 2,
-    completedTasks: 15,
-    availability: "Busy",
-    initials: "SA",
-  },
-  {
-    id: "ST-004",
-    name: "Rakib Hossain",
-    role: "Maintenance Staff",
-    activeTasks: 0,
-    completedTasks: 7,
-    availability: "Available",
-    initials: "RH",
-  },
-];
-
-const priorityStyles: Record<Priority, string> = {
-  Critical: "bg-red-50 text-red-700 border-red-100",
-  High: "bg-orange-50 text-orange-700 border-orange-100",
-  Medium: "bg-amber-50 text-amber-700 border-amber-100",
-  Low: "bg-gray-100 text-gray-600 border-gray-200",
+type DashboardData = {
+  department: Department;
+  statistics: DashboardStats;
+  recentIssues: Issue[];
 };
 
-const statusStyles: Record<IssueStatus, string> = {
-  Submitted: "bg-blue-50 text-blue-700",
-  "Under Review": "bg-amber-50 text-amber-700",
-  Assigned: "bg-violet-50 text-violet-700",
-  "In Progress": "bg-cyan-50 text-cyan-700",
-  Resolved: "bg-emerald-50 text-emerald-700",
+type ApiResponse = {
+  success: boolean;
+  message?: string;
+  data: DashboardData;
 };
+
+// Helpers
+
+const formatDate = (date?: string) => {
+  if (!date) return "N/A";
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) return "N/A";
+
+  return parsed.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const formatStatus = (status: string) => {
+  return status
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
+
+const statusStyles: Record<string, string> = {
+  submitted: "bg-blue-50 text-blue-700",
+  pending: "bg-blue-50 text-blue-700",
+  "under review": "bg-amber-50 text-amber-700",
+  assigned: "bg-violet-50 text-violet-700",
+  "in progress": "bg-cyan-50 text-cyan-700",
+  resolved: "bg-emerald-50 text-emerald-700",
+  closed: "bg-gray-100 text-gray-600",
+};
+
+const getStatusStyle = (status: string) => {
+  return (
+    statusStyles[status.toLowerCase().replace(/_/g, " ")] ||
+    "bg-gray-100 text-gray-600"
+  );
+};
+
+const getInitials = (name?: string | null) => {
+  if (!name) return "NA";
+
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0].toUpperCase())
+    .join("");
+};
+
+
+// Dashboard Component
 
 export default function DepartmentManagerDashboard() {
-  const [issues, setIssues] =
-    useState<DepartmentIssue[]>(initialIssues);
+  const [dashboard, setDashboard] =
+    useState<DashboardData | null>(null);
 
-  const [staff] = useState<StaffMember[]>(initialStaff);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [priorityFilter, setPriorityFilter] = useState("All");
+
+  // Fetch Dashboard API
+
+  const fetchDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(apiUrl("manager/dashboard"), {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      const result = await parseApiResponse<ApiResponse>(response);
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to load manager dashboard."
+        );
+      }
+
+      setDashboard(result.data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  // Dashboard Data
+
+  const department = dashboard?.department;
+
+  const stats = dashboard?.statistics;
+  const issues = dashboard?.recentIssues || [];
+
+  // Search and Filters
 
   const filteredIssues = useMemo(() => {
     return issues.filter((issue) => {
+      const searchText = search.toLowerCase();
+
       const matchesSearch =
-        issue.title.toLowerCase().includes(search.toLowerCase()) ||
-        issue.id.toLowerCase().includes(search.toLowerCase()) ||
-        issue.location.toLowerCase().includes(search.toLowerCase());
+        issue.title?.toLowerCase().includes(searchText) ||
+        issue.id?.toLowerCase().includes(searchText) ||
+        issue.category?.toLowerCase().includes(searchText) ||
+        issue.location_address?.toLowerCase().includes(searchText) ||
+        issue.location?.toLowerCase().includes(searchText);
+
+      const normalizedStatus = issue.status
+        ?.toLowerCase()
+        .replace(/_/g, " ");
 
       const matchesStatus =
-        statusFilter === "All" || issue.status === statusFilter;
+        statusFilter === "All" ||
+        normalizedStatus === statusFilter.toLowerCase();
 
-      const matchesPriority =
-        priorityFilter === "All" || issue.priority === priorityFilter;
-
-      return matchesSearch && matchesStatus && matchesPriority;
+      return matchesSearch && matchesStatus;
     });
-  }, [issues, search, statusFilter, priorityFilter]);
+  }, [issues, search, statusFilter]);
 
-  const stats = [
+
+  // Statistics
+
+  const statCards = [
     {
       title: "Department Issues",
-      value: issues.length,
+      value: stats?.totalIssues ?? 0,
       description: "Total department issues",
       icon: <ClipboardList size={21} />,
       color: "bg-teal-50 text-[#0F766E]",
     },
     {
       title: "Pending Review",
-      value: issues.filter(
-        (issue) =>
-          issue.status === "Submitted" ||
-          issue.status === "Under Review"
-      ).length,
+      value:
+        (stats?.pendingIssues ?? 0) +
+        (stats?.underReviewIssues ?? 0),
       description: "Waiting for verification",
       icon: <Clock3 size={21} />,
       color: "bg-amber-50 text-amber-600",
     },
     {
-      title: "Assigned Tasks",
-      value: issues.filter(
-        (issue) => issue.status === "Assigned"
-      ).length,
-      description: "Assigned to maintenance staff",
-      icon: <Users size={21} />,
-      color: "bg-blue-50 text-blue-600",
-    },
-    {
       title: "In Progress",
-      value: issues.filter(
-        (issue) => issue.status === "In Progress"
-      ).length,
+      value: stats?.inProgressIssues ?? 0,
       description: "Currently being resolved",
       icon: <Wrench size={21} />,
       color: "bg-violet-50 text-violet-600",
     },
     {
       title: "Resolved",
-      value: issues.filter(
-        (issue) => issue.status === "Resolved"
-      ).length,
-      description: "Successfully resolved",
+      value:
+        (stats?.resolvedIssues ?? 0) +
+        (stats?.closedIssues ?? 0),
+      description: "Successfully completed",
       icon: <CheckCircle2 size={21} />,
       color: "bg-emerald-50 text-emerald-600",
     },
+    {
+      title: "Maintenance Staff",
+      value: stats?.assignedStaffCount ?? 0,
+      description: "Assigned department staff",
+      icon: <Users size={21} />,
+      color: "bg-blue-50 text-blue-600",
+    },
   ];
 
-  const updateIssueStatus = (
-    id: string,
-    status: IssueStatus
-  ) => {
-    setIssues((previous) =>
-      previous.map((issue) =>
-        issue.id === id ? { ...issue, status } : issue
-      )
-    );
-  };
+  const resolvedCount =
+    (stats?.resolvedIssues ?? 0) +
+    (stats?.closedIssues ?? 0);
 
-  const activeIssues = issues.filter(
-    (issue) => issue.status !== "Resolved"
-  );
-
-  const resolvedCount = issues.filter(
-    (issue) => issue.status === "Resolved"
-  ).length;
+  const totalIssues = stats?.totalIssues ?? 0;
 
   const resolutionRate =
-    issues.length > 0
-      ? Math.round((resolvedCount / issues.length) * 100)
+    totalIssues > 0
+      ? Math.round((resolvedCount / totalIssues) * 100)
       : 0;
+
+  // Loading State
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F5FAF9]">
+        <div className="text-center">
+          <RefreshCw
+            size={32}
+            className="mx-auto animate-spin text-[#0F766E]"
+          />
+          <p className="mt-4 text-sm font-medium text-gray-600">
+            Loading department dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error State
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F5FAF9] px-4">
+        <div className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
+          <AlertCircle
+            size={40}
+            className="mx-auto text-red-500"
+          />
+
+          <h2 className="mt-4 text-lg font-bold text-gray-900">
+            Unable to Load Dashboard
+          </h2>
+
+          <p className="mt-2 text-sm text-gray-500">
+            {error}
+          </p>
+
+          <button
+            onClick={fetchDashboard}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-5 py-3 text-sm font-semibold text-white hover:bg-[#115E59]"
+          >
+            <RefreshCw size={16} />
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboard) return null;
+
+  // Main UI
 
   return (
     <div className="min-h-screen bg-[#F5FAF9]">
       <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">
         <div className="container mx-auto">
 
-          {/* Page Header */}
+          {/* Header */}
+
           <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <div className="mb-2 flex items-center gap-2 text-sm text-gray-400">
@@ -292,46 +343,75 @@ export default function DepartmentManagerDashboard() {
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                <CalendarDays size={17} className="text-[#0F766E]" />
-                November 23, 2026
+                <CalendarDays
+                  size={17}
+                  className="text-[#0F766E]"
+                />
+                {new Date().toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
               </div>
 
+              <button
+                onClick={fetchDashboard}
+                className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600 hover:border-[#0F766E] hover:text-[#0F766E]"
+              >
+                <RefreshCw size={16} />
+                Refresh
+              </button>
+
               <Link
-                href="/dashboard/manager/assign-tasks"
+                href="/dashboard/department-manager/department-issues"
                 className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#115E59]"
               >
-                <Users size={17} />
-                Assign Task
+                <ClipboardList size={17} />
+                Manage Issues
               </Link>
             </div>
           </div>
 
           {/* Department Banner */}
+
           <div className="mb-7 overflow-hidden rounded-2xl bg-[#134E4A] p-5 text-white sm:p-6">
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
               <div>
                 <div className="mb-3 flex items-center gap-2">
-                  <ShieldCheck size={18} className="text-teal-300" />
+                  <ShieldCheck
+                    size={18}
+                    className="text-teal-300"
+                  />
+
                   <span className="text-xs font-semibold uppercase tracking-wider text-teal-200">
                     Department Workspace
                   </span>
                 </div>
 
                 <h2 className="text-xl font-bold sm:text-2xl">
-                  Road & Infrastructure Department
+                  {department?.name || "Department"}
                 </h2>
 
                 <p className="mt-2 max-w-xl text-sm leading-6 text-teal-100">
-                  Manage infrastructure issues, coordinate maintenance
-                  staff and ensure timely resolution of citizen reports.
+                  {department?.description ||
+                    "Manage department issues, coordinate maintenance staff and ensure timely resolution of citizen reports."}
                 </p>
+
+                {department?.location && (
+                  <p className="mt-3 flex items-center gap-2 text-xs text-teal-200">
+                    <MapPin size={14} />
+                    {department.location}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-5 sm:gap-7">
                 <div>
-                  <p className="text-3xl font-bold">{staff.length}</p>
+                  <p className="text-3xl font-bold">
+                    {stats?.assignedStaffCount ?? 0}
+                  </p>
                   <p className="mt-1 text-xs text-teal-200">
-                    Team Members
+                    Assigned Staff
                   </p>
                 </div>
 
@@ -339,10 +419,12 @@ export default function DepartmentManagerDashboard() {
 
                 <div>
                   <p className="text-3xl font-bold">
-                    {activeIssues.length}
+                    {totalIssues - resolvedCount >= 0
+                      ? totalIssues - resolvedCount
+                      : 0}
                   </p>
                   <p className="mt-1 text-xs text-teal-200">
-                    Active Issues
+                    Unresolved Issues
                   </p>
                 </div>
               </div>
@@ -350,8 +432,9 @@ export default function DepartmentManagerDashboard() {
           </div>
 
           {/* Statistics */}
+
           <section className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {stats.map((stat) => (
+            {statCards.map((stat) => (
               <div
                 key={stat.title}
                 className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"
@@ -382,80 +465,101 @@ export default function DepartmentManagerDashboard() {
           </section>
 
           {/* Overview Panels */}
+
           <section className="mb-7 grid grid-cols-1 gap-5 lg:grid-cols-3">
 
-            {/* Priority Overview */}
+            {/* Status Overview */}
+
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm lg:col-span-2">
               <div className="mb-5 flex items-center justify-between">
                 <div>
                   <h2 className="font-bold text-gray-900">
-                    Issue Priority Overview
+                    Issue Status Overview
                   </h2>
+
                   <p className="mt-1 text-xs text-gray-500">
-                    Active issue distribution by priority
+                    Current department issue distribution
                   </p>
                 </div>
 
-                <AlertCircle size={20} className="text-[#0F766E]" />
+                <Activity
+                  size={20}
+                  className="text-[#0F766E]"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                {(
-                  ["Critical", "High", "Medium", "Low"] as Priority[]
-                ).map((priority) => {
-                  const count = activeIssues.filter(
-                    (issue) => issue.priority === priority
-                  ).length;
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {[
+                  {
+                    title: "Submitted",
+                    value: stats?.pendingIssues ?? 0,
+                    color: "bg-blue-500",
+                  },
+                  {
+                    title: "Under Review",
+                    value: stats?.underReviewIssues ?? 0,
+                    color: "bg-amber-500",
+                  },
+                  {
+                    title: "In Progress",
+                    value: stats?.inProgressIssues ?? 0,
+                    color: "bg-cyan-500",
+                  },
+                  {
+                    title: "Resolved",
+                    value: stats?.resolvedIssues ?? 0,
+                    color: "bg-emerald-500",
+                  },
+                  {
+                    title: "Closed",
+                    value: stats?.closedIssues ?? 0,
+                    color: "bg-gray-500",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    className="rounded-xl border border-gray-100 p-4"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${item.color}`}
+                      />
 
-                  return (
-                    <div
-                      key={priority}
-                      className="rounded-xl border border-gray-100 p-4"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${
-                            priority === "Critical"
-                              ? "bg-red-500"
-                              : priority === "High"
-                                ? "bg-orange-500"
-                                : priority === "Medium"
-                                  ? "bg-amber-500"
-                                  : "bg-gray-400"
-                          }`}
-                        />
-
-                        <span className="text-xs font-medium text-gray-500">
-                          {priority}
-                        </span>
-                      </div>
-
-                      <p className="mt-3 text-2xl font-bold text-gray-900">
-                        {count}
-                      </p>
-
-                      <p className="mt-1 text-xs text-gray-400">
-                        Active issues
-                      </p>
+                      <span className="text-xs font-medium text-gray-500">
+                        {item.title}
+                      </span>
                     </div>
-                  );
-                })}
+
+                    <p className="mt-3 text-2xl font-bold text-gray-900">
+                      {item.value}
+                    </p>
+
+                    <p className="mt-1 text-xs text-gray-400">
+                      Issues
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Resolution Rate */}
+
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-bold text-gray-900">
                     Resolution Rate
                   </h2>
+
                   <p className="mt-1 text-xs text-gray-500">
                     Overall department progress
                   </p>
                 </div>
 
-                <Activity size={20} className="text-[#0F766E]" />
+                <Activity
+                  size={20}
+                  className="text-[#0F766E]"
+                />
               </div>
 
               <div className="mt-7 flex items-center justify-center">
@@ -469,6 +573,7 @@ export default function DepartmentManagerDashboard() {
                     <p className="text-3xl font-bold text-gray-900">
                       {resolutionRate}%
                     </p>
+
                     <p className="text-[10px] text-gray-400">
                       Resolved
                     </p>
@@ -477,12 +582,13 @@ export default function DepartmentManagerDashboard() {
               </div>
 
               <p className="mt-5 text-center text-xs text-gray-500">
-                {resolvedCount} out of {issues.length} issues resolved
+                {resolvedCount} out of {totalIssues} issues completed
               </p>
             </div>
           </section>
 
           {/* Recent Issues */}
+
           <section className="mb-7 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
 
             <div className="flex flex-col justify-between gap-4 border-b border-gray-100 p-5 sm:flex-row sm:items-center">
@@ -490,13 +596,14 @@ export default function DepartmentManagerDashboard() {
                 <h2 className="text-lg font-bold text-gray-900">
                   Recent Department Issues
                 </h2>
+
                 <p className="mt-1 text-sm text-gray-500">
-                  Review and manage the latest reported issues.
+                  Review and monitor recently reported issues.
                 </p>
               </div>
 
               <Link
-                href="/dashboard/manager/issues"
+                href="/dashboard/department-manager/department-issues"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-[#0F766E] hover:underline"
               >
                 View All Issues
@@ -505,6 +612,7 @@ export default function DepartmentManagerDashboard() {
             </div>
 
             {/* Filters */}
+
             <div className="flex flex-col gap-3 border-b border-gray-100 p-5 lg:flex-row lg:items-center">
               <div className="relative flex-1">
                 <Search
@@ -529,7 +637,9 @@ export default function DepartmentManagerDashboard() {
 
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={(e) =>
+                      setStatusFilter(e.target.value)
+                    }
                     className="h-11 appearance-none rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-8 text-sm text-gray-600 outline-none focus:border-[#0F766E]"
                   >
                     <option value="All">All Status</option>
@@ -538,43 +648,35 @@ export default function DepartmentManagerDashboard() {
                     <option value="Assigned">Assigned</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Resolved">Resolved</option>
+                    <option value="Closed">Closed</option>
                   </select>
                 </div>
 
-                <select
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="h-11 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-600 outline-none focus:border-[#0F766E]"
-                >
-                  <option value="All">All Priority</option>
-                  <option value="Critical">Critical</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
               </div>
             </div>
 
-            {/* Issues Table */}
+            {/* Desktop Table */}
+
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[950px] text-left">
+              <table className="w-full min-w-[900px] text-left">
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-5 py-4 font-semibold">
                       Issue Details
                     </th>
-                    <th className="px-5 py-4 font-semibold">
-                      Priority
-                    </th>
+
                     <th className="px-5 py-4 font-semibold">
                       Status
                     </th>
+
                     <th className="px-5 py-4 font-semibold">
                       Assigned Staff
                     </th>
+
                     <th className="px-5 py-4 font-semibold">
                       Reported
                     </th>
+
                     <th className="px-5 py-4 text-right font-semibold">
                       Action
                     </th>
@@ -582,88 +684,87 @@ export default function DepartmentManagerDashboard() {
                 </thead>
 
                 <tbody className="divide-y divide-gray-100">
-                  {filteredIssues.map((issue) => (
-                    <tr
-                      key={issue.id}
-                      className="transition hover:bg-gray-50/70"
-                    >
-                      <td className="px-5 py-4">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {issue.title}
-                        </p>
+                  {filteredIssues.map((issue) => {
+                    const assignedName =
+                      issue.assigned_staff_name ||
+                      issue.assignedTo;
 
-                        <p className="mt-1 text-xs text-gray-400">
-                          {issue.id} · {issue.category}
-                        </p>
+                    return (
+                      <tr
+                        key={issue.id}
+                        className="transition hover:bg-gray-50/70"
+                      >
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {issue.title}
+                          </p>
 
-                        <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-                          <MapPin
-                            size={13}
-                            className="text-[#0F766E]"
-                          />
-                          {issue.location}
-                        </p>
-                      </td>
+                          <p className="mt-1 text-xs text-gray-400">
+                            {issue.id} · {issue.category}
+                          </p>
 
-                      <td className="px-5 py-4">
-                        <span
-                          className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${priorityStyles[issue.priority]}`}
-                        >
-                          {issue.priority}
-                        </span>
-                      </td>
+                          <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                            <MapPin
+                              size={13}
+                              className="text-[#0F766E]"
+                            />
+                            {issue.location_address ||
+                              issue.location ||
+                              "Location unavailable"}
+                          </p>
+                        </td>
 
-                      <td className="px-5 py-4">
-                        <span
-                          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[issue.status]}`}
-                        >
-                          {issue.status}
-                        </span>
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {issue.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#CCFBF1] text-[10px] font-bold text-[#0F766E]">
-                              {issue.assignedTo
-                                .split(" ")
-                                .map((word) => word[0])
-                                .join("")}
-                            </div>
-
-                            <span className="text-xs font-medium text-gray-700">
-                              {issue.assignedTo}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs font-medium text-amber-600">
-                            Not assigned
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4 text-xs text-gray-500">
-                        {issue.date}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <div className="flex justify-end">
-                          <Link
-                            href={`/dashboard/manager/issues/${issue.id}`}
-                            className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-[#0F766E] hover:text-[#0F766E]"
-                            title="View issue details"
+                        <td className="px-5 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusStyle(issue.status)}`}
                           >
-                            <ArrowUpRight size={16} />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {formatStatus(issue.status)}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          {assignedName ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#CCFBF1] text-[10px] font-bold text-[#0F766E]">
+                                {getInitials(assignedName)}
+                              </div>
+
+                              <span className="text-xs font-medium text-gray-700">
+                                {assignedName}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium text-amber-600">
+                              Not assigned
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4 text-xs text-gray-500">
+                          {formatDate(
+                            issue.created_at || issue.createdAt
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex justify-end">
+                            <Link
+                              href={`/dashboard/department-manager/department-issues/${issue.id}`}
+                              className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-[#0F766E] hover:text-[#0F766E]"
+                              title="View issue details"
+                            >
+                              <ArrowUpRight size={16} />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {filteredIssues.length === 0 && (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={5}
                         className="px-5 py-12 text-center text-sm text-gray-500"
                       >
                         No issues found.
@@ -674,7 +775,8 @@ export default function DepartmentManagerDashboard() {
               </table>
             </div>
 
-            {/* Mobile Issue Cards */}
+            {/* Mobile Cards */}
+
             <div className="space-y-3 p-4 md:hidden">
               {filteredIssues.map((issue) => (
                 <div
@@ -693,30 +795,35 @@ export default function DepartmentManagerDashboard() {
                     </div>
 
                     <span
-                      className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold ${priorityStyles[issue.priority]}`}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${getStatusStyle(issue.status)}`}
                     >
-                      {issue.priority}
+                      {formatStatus(issue.status)}
                     </span>
                   </div>
 
                   <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
                     <MapPin size={14} />
-                    {issue.location}
+                    {issue.location_address ||
+                      issue.location ||
+                      "Location unavailable"}
                   </p>
 
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                    <span
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[issue.status]}`}
-                    >
-                      {issue.status}
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className="text-xs text-gray-400">
+                      {formatDate(
+                        issue.created_at || issue.createdAt
+                      )}
                     </span>
 
                     <Link
-                      href={`/dashboard/manager/issues/${issue.id}`}
+                      href={`/dashboard/department-manager/department-issues/${issue.id}`}
                       className="text-xs font-semibold text-[#0F766E]"
                     >
                       View Details
-                      <ArrowUpRight size={14} className="ml-1 inline" />
+                      <ArrowUpRight
+                        size={14}
+                        className="ml-1 inline"
+                      />
                     </Link>
                   </div>
                 </div>
@@ -730,147 +837,63 @@ export default function DepartmentManagerDashboard() {
             </div>
           </section>
 
-          {/* Staff Management + Activity */}
-          <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {/* Department Management Links */}
 
-            {/* Staff Overview */}
+          <section className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-              <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 text-[#0F766E]">
+                  <Users size={21} />
+                </div>
+
                 <div>
                   <h2 className="font-bold text-gray-900">
                     Maintenance Team
                   </h2>
+
                   <p className="mt-1 text-xs text-gray-500">
-                    Staff workload and availability
+                    {stats?.assignedStaffCount ?? 0} staff members
                   </p>
                 </div>
-
-                <Link
-                  href="/dashboard/manager/staff"
-                  className="text-sm font-semibold text-[#0F766E] hover:underline"
-                >
-                  View All
-                </Link>
               </div>
 
-              <div className="space-y-4">
-                {staff.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center gap-3 border-b border-gray-100 pb-4 last:border-0 last:pb-0"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#CCFBF1] text-xs font-bold text-[#0F766E]">
-                      {member.initials}
-                    </div>
+              <p className="mt-4 text-sm text-gray-500">
+                View your department&apos;s maintenance staff and manage task assignments.
+              </p>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-800">
-                        {member.name}
-                      </p>
-
-                      <p className="mt-1 text-xs text-gray-400">
-                        {member.role}
-                      </p>
-                    </div>
-
-                    <div className="hidden text-right sm:block">
-                      <p className="text-sm font-semibold text-gray-800">
-                        {member.activeTasks} Active
-                      </p>
-
-                      <p className="mt-1 text-xs text-gray-400">
-                        {member.completedTasks} Completed
-                      </p>
-                    </div>
-
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                        member.availability === "Available"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {member.availability}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <p className="mt-5 text-xs text-gray-400">
+                Staff management is not available yet.
+              </p>
             </div>
 
-            {/* Recent Activities */}
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-              <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Activity size={21} />
+                </div>
+
                 <div>
                   <h2 className="font-bold text-gray-900">
-                    Recent Activities
+                    Department Reports
                   </h2>
+
                   <p className="mt-1 text-xs text-gray-500">
-                    Latest department updates
+                    Department performance
                   </p>
                 </div>
-
-                <Activity size={20} className="text-[#0F766E]" />
               </div>
 
-              <div className="space-y-5">
-                {[
-                  {
-                    icon: <CheckCircle2 size={16} />,
-                    color: "bg-emerald-50 text-emerald-600",
-                    title: "Issue marked as resolved",
-                    description: "CP-00110 · Garbage collection cleanup",
-                    time: "Today",
-                  },
-                  {
-                    icon: <Wrench size={16} />,
-                    color: "bg-blue-50 text-blue-600",
-                    title: "Maintenance work started",
-                    description: "CP-00118 · Blocked drainage system",
-                    time: "Yesterday",
-                  },
-                  {
-                    icon: <Users size={16} />,
-                    color: "bg-violet-50 text-violet-600",
-                    title: "New task assigned",
-                    description: "CP-00124 · Road damage",
-                    time: "2 days ago",
-                  },
-                  {
-                    icon: <AlertCircle size={16} />,
-                    color: "bg-amber-50 text-amber-600",
-                    title: "New issue reported",
-                    description: "CP-00121 · Streetlight",
-                    time: "2 days ago",
-                  },
-                ].map((activity) => (
-                  <div
-                    key={activity.title}
-                    className="flex items-start gap-3"
-                  >
-                    <div
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${activity.color}`}
-                    >
-                      {activity.icon}
-                    </div>
+              <p className="mt-4 text-sm text-gray-500">
+                Review department issue statistics and monitor resolution progress.
+              </p>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-800">
-                        {activity.title}
-                      </p>
-
-                      <p className="mt-1 truncate text-xs text-gray-400">
-                        {activity.description}
-                      </p>
-                    </div>
-
-                    <span className="shrink-0 text-[10px] text-gray-400">
-                      {activity.time}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <p className="mt-5 text-xs text-gray-400">
+                Detailed analytics are not available yet.
+              </p>
             </div>
           </section>
+
         </div>
       </main>
     </div>

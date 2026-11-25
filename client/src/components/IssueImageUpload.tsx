@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { uploadIssueImages } from "@/services/issue-image.service";
 
 interface IssueImageUploadProps {
     issueId: string;
@@ -17,29 +18,10 @@ export default function IssueImageUpload({
     const handleUpload = async () => {
         if (!files.length) return;
 
-        const formData = new FormData();
-
-        files.forEach((file) => {
-            formData.append("images", file);
-        });
-
         try {
             setLoading(true);
 
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/issues/${issueId}/images`,
-                {
-                    method: "POST",
-                    credentials: "include",
-                    body: formData,
-                }
-            );
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message);
-            }
+            const result = await uploadIssueImages(issueId, files);
 
             setUploadedImages((prev) => [
                 ...prev,

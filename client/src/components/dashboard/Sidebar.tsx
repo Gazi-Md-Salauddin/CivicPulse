@@ -1,23 +1,19 @@
 "use client";
 
-import { type ComponentType, type SVGProps } from "react";
+import { Suspense, type ComponentType, type SVGProps } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
   Bars,
-  Bell,
   Envelope,
-  Gear,
   House,
-  Magnifier,
   Person,
 } from "@gravity-ui/icons";
 
 import { Button, Drawer } from "@heroui/react";
 
 import {
-  ArrowUpRight,
   ChevronRight,
   HardHat,
 } from "lucide-react";
@@ -57,8 +53,6 @@ type RoleConfig = {
   sections: NavSection[];
   supportTitle: string;
   supportDescription: string;
-  supportLink: string;
-  supportLinkLabel: string;
 };
 
 
@@ -87,18 +81,8 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
           },
           {
             label: "Create Issue",
-            href: "/dashboard/citizen/create-issue",
-            icon: Bell,
-          },
-          {
-            label: "Nearby Issues",
-            href: "/dashboard/citizen/nearby-issues",
-            icon: Magnifier,
-          },
-          {
-            label: "Notifications",
-            href: "/dashboard/citizen/notifications",
-            icon: Bell,
+            href: "/create-issue",
+            icon: House,
           },
         ],
       },
@@ -110,11 +94,6 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
             href: "/dashboard/citizen/profile",
             icon: Person,
           },
-          {
-            label: "Settings",
-            href: "/dashboard/citizen/settings",
-            icon: Gear,
-          },
         ],
       },
     ],
@@ -122,8 +101,6 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
     supportTitle: "Need assistance?",
     supportDescription:
       "Have questions or need help reporting a community issue?",
-    supportLink: "/contact",
-    supportLinkLabel: "Get Support",
   },
 
   admin: {
@@ -151,31 +128,6 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
             href: "/dashboard/admin/departments",
             icon: House,
           },
-          {
-            label: "All Reports",
-            href: "/dashboard/admin/reports",
-            icon: Envelope,
-          },
-          {
-            label: "Analytics",
-            href: "/dashboard/admin/analytics",
-            icon: Magnifier,
-          },
-        ],
-      },
-      {
-        title: "Account",
-        items: [
-          {
-            label: "Settings",
-            href: "/dashboard/admin/settings",
-            icon: Gear,
-          },
-          {
-            label: "Profile",
-            href: "/dashboard/admin/profile",
-            icon: Person,
-          },
         ],
       },
     ],
@@ -183,15 +135,13 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
     supportTitle: "System Support",
     supportDescription:
       "Manage your platform and get assistance when needed.",
-    supportLink: "/contact",
-    supportLinkLabel: "Get Support",
   },
 
   "department-manager": {
     portalName: "Department Portal",
     workspaceName: "Manager Workspace",
     workspaceDescription: "Department Manager",
-    workspaceIcon: Gear,
+    workspaceIcon: HardHat,
 
     sections: [
       {
@@ -204,38 +154,8 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
           },
           {
             label: "Department Issues",
-            href: "/dashboard/department-manager/issues",
+            href: "/dashboard/department-manager/department-issues",
             icon: Envelope,
-          },
-          {
-            label: "Assign Tasks",
-            href: "/dashboard/department-manager/assign-tasks",
-            icon: Bell,
-          },
-          {
-            label: "Staff",
-            href: "/dashboard/department-manager/staff",
-            icon: Person,
-          },
-          {
-            label: "Analytics",
-            href: "/dashboard/department-manager/analytics",
-            icon: Magnifier,
-          },
-        ],
-      },
-      {
-        title: "Account",
-        items: [
-          {
-            label: "Profile",
-            href: "/dashboard/department-manager/profile",
-            icon: Person,
-          },
-          {
-            label: "Settings",
-            href: "/dashboard/department-manager/settings",
-            icon: Gear,
           },
         ],
       },
@@ -244,8 +164,6 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
     supportTitle: "Manager Support",
     supportDescription:
       "Need help managing your department and maintenance team?",
-    supportLink: "/contact",
-    supportLinkLabel: "Get Support",
   },
 
   "maintenance-staff": {
@@ -263,46 +181,6 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
             href: "/dashboard/maintenance-staff",
             icon: House,
           },
-          {
-            label: "My Tasks",
-            href: "/dashboard/staff/tasks",
-            icon: Envelope,
-          },
-          {
-            label: "In Progress",
-            href: "/dashboard/staff/in-progress",
-            icon: Bell,
-          },
-          {
-            label: "Completed Tasks",
-            href: "/dashboard/staff/completed",
-            icon: House,
-          },
-          {
-            label: "My Schedule",
-            href: "/dashboard/staff/schedule",
-            icon: Magnifier,
-          },
-          {
-            label: "Notifications",
-            href: "/dashboard/staff/notifications",
-            icon: Bell,
-          },
-        ],
-      },
-      {
-        title: "Account",
-        items: [
-          {
-            label: "Profile",
-            href: "/dashboard/staff/profile",
-            icon: Person,
-          },
-          {
-            label: "Settings",
-            href: "/dashboard/staff/settings",
-            icon: Gear,
-          },
         ],
       },
     ],
@@ -310,8 +188,6 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
     supportTitle: "Need assistance?",
     supportDescription:
       "Contact your department manager for task-related support.",
-    supportLink: "/contact",
-    supportLinkLabel: "Get Support",
   },
 };
 
@@ -434,7 +310,9 @@ export default function Sidebar({
                 </Drawer.Header>
 
                 <Drawer.Body>
-                  <NavigationItems role={role} />
+                  <Suspense fallback={null}>
+                    <NavigationItems role={role} />
+                  </Suspense>
                 </Drawer.Body>
               </Drawer.Dialog>
             </Drawer.Content>
@@ -472,7 +350,9 @@ export default function Sidebar({
 
         {/* Dynamic Navigation */}
         <div className="flex-1 overflow-y-auto">
-          <NavigationItems role={role} />
+          <Suspense fallback={null}>
+            <NavigationItems role={role} />
+          </Suspense>
         </div>
 
         {/* Support Card */}
@@ -485,13 +365,6 @@ export default function Sidebar({
             {config.supportDescription}
           </p>
 
-          <Link
-            href={config.supportLink}
-            className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-white transition hover:text-teal-200"
-          >
-            {config.supportLinkLabel}
-            <ArrowUpRight size={14} />
-          </Link>
         </div>
       </div>
     </aside>

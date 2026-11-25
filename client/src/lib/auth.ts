@@ -1,37 +1,22 @@
-import { betterAuth } from "better-auth";
-import pool from "pg";
+import { NextRequest, NextResponse } from "next/server";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-export const auth = betterAuth({
-  basePath: process.env.NEXT_PUBLIC_API_URL,
+export const forwardAuthRequest = (request: NextRequest) => {
+  if (!API_URL) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+  }
 
-  trustedOrigins: [
-    process.env.BETTER_AUTH_URL || 'http://localhost:3000',
-  ],
+  const apiUrl = new URL(API_URL);
+  const apiPath = apiUrl.pathname.replace(/\/+$/, "");
+  const authPath = request.nextUrl.pathname.replace(
+    /^\/api\/auth(?=\/|$)/,
+    ""
+  );
+  const targetUrl = new URL(
+    `${apiPath}${authPath}${request.nextUrl.search}`,
+    apiUrl.origin
+  );
 
-  database: pool,
-
-  emailAndPassword: {
-    enabled: true,
-  },
-
-  user: {
-    additionalFields: {
-      address: {
-        type: "string",
-        required: true,
-      },
-
-      role: {
-        type: [
-          "citizen",
-          "department_manager",
-          "maintenance_staff",
-        ],
-        required: true,
-        defaultValue: "citizen",
-        input: true,
-      },
-    },
-  },
-});
+  return NextResponse.redirect(targetUrl, 307);
+};
