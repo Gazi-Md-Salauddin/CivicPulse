@@ -15,6 +15,14 @@ export const auth = betterAuth({
     enabled: true,
   },
 
+  advanced: {
+    defaultCookieAttributes: {
+      sameSite: "none",
+      secure: true,
+      httpOnly: true,
+    },
+  },
+
   user: {
     additionalFields: {
       address: {
