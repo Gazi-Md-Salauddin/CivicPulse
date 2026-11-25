@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Eye,
   RefreshCw,
+  Image as ImageIcon,
 } from "lucide-react";
 
 import { getIssues } from "@/services/issue.service";
@@ -43,8 +44,8 @@ type Issue = {
   location: string;
   date: string;
   status: IssueStatus;
-  priority: IssuePriority;
-  image: string;
+  priority: IssuePriority | null;
+  image: string | null;
 };
 
 // Status Styles
@@ -101,10 +102,11 @@ function mapIssue(issue: IIssue): Issue {
     location: issue.location_address || "Location not available",
     date: issue.created_at,
     status: statusMap[statusKey] || "Submitted",
-    priority: "Medium",
-    image:
-      issue.image_url ||
-      "https://placehold.co/900x500?text=No+Image",
+    priority: issue.priority
+      ? (issue.priority.charAt(0).toUpperCase() +
+          issue.priority.slice(1)) as IssuePriority
+      : null,
+    image: issue.image_url,
   };
 }
 
@@ -127,7 +129,7 @@ export default function MyReportsPage() {
   const pageSize = 4;
 
   // Fetch Issues
-  const fetchIssues = async () => {
+  const fetchIssues = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -152,11 +154,12 @@ export default function MyReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchIssues();
-  }, []);
+    const timer = window.setTimeout(() => void fetchIssues(), 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchIssues]);
 
   // Filter, Search and Sort
   const filteredReports = useMemo(() => {
@@ -531,11 +534,18 @@ export default function MyReportsPage() {
                           : "h-48"
                         }`}
                     >
-                      <img
-                        src={report.image}
-                        alt={report.title}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      />
+                      {report.image ? (
+                        <img
+                          src={report.image}
+                          alt={report.title}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-gray-400">
+                          <ImageIcon size={28} />
+                          No photo attached
+                        </div>
+                      )}
 
                       <span
                         className={`absolute left-3 top-3 rounded-md px-3 py-1.5 text-xs font-semibold ${statusStyles[report.status]}`}
@@ -553,9 +563,15 @@ export default function MyReportsPage() {
                           </span>
                         </div>
                         <span
-                          className={`text-xs font-semibold ${priorityStyles[report.priority]}`}
+                          className={`text-xs font-semibold ${
+                            report.priority
+                              ? priorityStyles[report.priority]
+                              : "text-gray-400"
+                          }`}
                         >
-                          {report.priority} Priority
+                          {report.priority
+                            ? `${report.priority} Priority`
+                            : "Priority not set"}
                         </span>
                       </div>
 
@@ -619,7 +635,7 @@ export default function MyReportsPage() {
                 </h3>
 
                 <p className="mt-2 text-sm text-gray-500">
-                  You haven't submitted any reports yet, or no reports match your filters.
+                  You have not submitted any reports yet, or no reports match your filters.
                 </p>
 
                 <button

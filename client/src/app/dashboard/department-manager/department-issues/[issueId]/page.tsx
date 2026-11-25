@@ -1,11 +1,11 @@
 
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { apiUrl, parseApiResponse } from "@/services/api";
 import {
   ArrowLeft,
+  CheckCircle2,
   MapPin,
   CalendarDays,
   UserRound,
@@ -15,7 +15,20 @@ import {
   AlertCircle,
   ClipboardList,
   Mail,
+  AlertTriangle,
+  Check,
 } from "lucide-react";
+import {
+  assignManagerIssue,
+  closeManagerIssue,
+  getManagerIssueDetails,
+  getManagerStaff,
+  rejectManagerIssue,
+  setManagerIssuePriority,
+  verifyManagerIssue,
+  type IssuePriority,
+  type StaffMember,
+} from "@/services/issue-workflow.service";
 
 type AssignedStaff = {
   id: string;
@@ -36,18 +49,44 @@ type IssueDetails = {
   longitude: number | null;
   reporter_id: string;
   status: string;
+  priority: IssuePriority | null;
   created_at: string;
   updated_at: string;
   department_id: string;
   department_name: string;
   assigned_staff: AssignedStaff[];
+  status_history: Array<{
+    id: string;
+    previous_status: string | null;
+    new_status: string;
+    public_message: string | null;
+    internal_reason?: string | null;
+    changed_by_name?: string;
+    created_at: string;
+  }>;
+  work_notes: Array<{
+    id: string;
+    note: string;
+    staff_name?: string;
+    created_at: string;
+  }>;
+  completion_photos: Array<{
+    id: string;
+    image_url: string;
+    created_at: string;
+    uploaded_by_name?: string;
+  }>;
 };
 
-type IssueDetailsResponse = {
-  success: boolean;
-  message: string;
-  data: IssueDetails;
-};
+const issuePriorities: IssuePriority[] = [
+  "low",
+  "medium",
+  "high",
+  "critical",
+];
+
+const getIssuePriority = (value: string): IssuePriority | "" =>
+  issuePriorities.find((priority) => priority === value) ?? "";
 
 function getStatusStyle(status: string) {
   switch (status.toLowerCase().replace(/_/g, " ")) {
@@ -63,6 +102,8 @@ function getStatusStyle(status: string) {
       return "bg-emerald-50 text-emerald-700 border-emerald-200";
     case "closed":
       return "bg-gray-100 text-gray-600 border-gray-200";
+    case "rejected":
+      return "bg-red-50 text-red-700 border-red-200";
     default:
       return "bg-gray-100 text-gray-600 border-gray-200";
   }
@@ -90,31 +131,37 @@ function ManagerIssueDetailsContent() {
   const issueId = params.issueId;
 
   const [issue, setIssue] = useState<IssueDetails | null>(null);
+  const [staffCandidates, setStaffCandidates] = useState<StaffMember[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [selectedPriority, setSelectedPriority] =
+    useState<IssuePriority | "">("");
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [savingAction, setSavingAction] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [actionSuccess, setActionSuccess] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchIssueDetails = async () => {
+  const fetchIssueDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetch(
-        apiUrl(`manager/departmentissues/${issueId}`),
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
+      const [issueResponse, candidateResponse] = await Promise.all([
+        getManagerIssueDetails(issueId),
+        getManagerStaff(),
+      ]);
+      setIssue(issueResponse.data);
+      setSelectedPriority(issueResponse.data.priority ?? "");
+      const eligibleStaff = candidateResponse.data.staff.filter(
+        (staff) => staff.is_active
       );
-
-      const result =
-        await parseApiResponse<IssueDetailsResponse>(response);
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to load issue details");
-      }
-
-      setIssue(result.data);
+      setStaffCandidates(eligibleStaff);
+      setSelectedStaffId((current) =>
+        eligibleStaff.some((staff) => staff.id === current)
+          ? current
+          : eligibleStaff[0]?.id ?? ""
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Something went wrong"
@@ -122,13 +169,36 @@ function ManagerIssueDetailsContent() {
     } finally {
       setLoading(false);
     }
+  }, [issueId]);
+
+  const performAction = async (
+    action: () => Promise<unknown>,
+    message: string
+  ) => {
+    try {
+      setSavingAction(true);
+      setActionError("");
+      setActionSuccess("");
+      await action();
+      await fetchIssueDetails();
+      setActionSuccess(message);
+    } catch (actionFailure) {
+      setActionError(
+        actionFailure instanceof Error
+          ? actionFailure.message
+          : "Unable to complete this operation."
+      );
+    } finally {
+      setSavingAction(false);
+    }
   };
 
   useEffect(() => {
-    if (issueId) {
-      fetchIssueDetails();
-    }
-  }, [issueId]);
+    const timer = window.setTimeout(() => {
+      if (issueId) void fetchIssueDetails();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [issueId, fetchIssueDetails]);
 
   if (loading) {
     return (
@@ -230,6 +300,175 @@ function ManagerIssueDetailsContent() {
           </div>
         </div>
 
+        <section className="space-y-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-teal-50 p-2.5 text-[#0F766E]">
+              <ClipboardList size={20} />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-900">Issue operations</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Available actions are limited by the current workflow status.
+              </p>
+            </div>
+          </div>
+
+          {actionError && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+              {actionError}
+            </div>
+          )}
+          {actionSuccess && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              <Check size={17} />
+              {actionSuccess}
+            </div>
+          )}
+
+          {(issue.status === "submitted" ||
+            issue.status === "pending" ||
+            issue.status === "under_review") && (
+            <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row">
+              {(issue.status === "submitted" || issue.status === "pending") && (
+                <button
+                  disabled={savingAction}
+                  onClick={() =>
+                    void performAction(
+                      () => verifyManagerIssue(issue.id),
+                      "Issue moved to under review."
+                    )
+                  }
+                  className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  Verify report
+                </button>
+              )}
+              <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
+                <input
+                  value={rejectionReason}
+                  onChange={(event) => setRejectionReason(event.target.value)}
+                  maxLength={2000}
+                  placeholder="Reason required to reject"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E]"
+                />
+                <button
+                  disabled={savingAction || !rejectionReason.trim()}
+                  onClick={() =>
+                    void performAction(
+                      () => rejectManagerIssue(issue.id, rejectionReason.trim()),
+                      "Issue rejected."
+                    )
+                  }
+                  className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
+
+          {issue.status !== "closed" && issue.status !== "rejected" && (
+            <div className="grid gap-3 border-t border-gray-100 pt-4 md:grid-cols-2">
+              <div className="flex gap-2">
+                <select
+                  value={selectedPriority}
+                  disabled={savingAction}
+                  onChange={(event) =>
+                    setSelectedPriority(getIssuePriority(event.target.value))
+                  }
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                  aria-label="Issue priority"
+                >
+                  <option value="">Select priority</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+                <button
+                  disabled={
+                    savingAction ||
+                    !selectedPriority ||
+                    selectedPriority === issue.priority
+                  }
+                  onClick={() =>
+                    selectedPriority &&
+                    void performAction(
+                      () =>
+                        setManagerIssuePriority(issue.id, selectedPriority),
+                      "Priority updated."
+                    )
+                  }
+                  className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Set priority
+                </button>
+              </div>
+
+              {(issue.status === "under_review" ||
+                issue.status === "assigned") && (
+                <div className="flex gap-2">
+                  <select
+                    value={selectedStaffId}
+                    disabled={savingAction || staffCandidates.length === 0}
+                    onChange={(event) => setSelectedStaffId(event.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                    aria-label="Maintenance staff assignment"
+                  >
+                    {staffCandidates.length === 0 ? (
+                      <option value="">No active department staff</option>
+                    ) : (
+                      staffCandidates.map((staff) => (
+                        <option key={staff.id} value={staff.id}>
+                          {staff.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <button
+                    disabled={savingAction || !selectedStaffId}
+                    onClick={() =>
+                      void performAction(
+                        () => assignManagerIssue(issue.id, selectedStaffId),
+                        "Maintenance staff assigned."
+                      )
+                    }
+                    className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    Assign
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {issue.status === "resolved" && (
+            <div className="border-t border-gray-100 pt-4">
+              <button
+                disabled={savingAction}
+                onClick={() =>
+                  void performAction(
+                    () => closeManagerIssue(issue.id),
+                    "Issue closed successfully."
+                  )
+                }
+                className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                <CheckCircle2 size={17} />
+                Review and close
+              </button>
+            </div>
+          )}
+
+          {(issue.status === "closed" || issue.status === "rejected") && (
+            <p className="border-t border-gray-100 pt-4 text-sm text-gray-500">
+              This issue is {formatStatus(issue.status).toLowerCase()} and is
+              read-only in the standard workflow.
+            </p>
+          )}
+        </section>
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Main content */}
           <div className="space-y-6 lg:col-span-2">
@@ -278,6 +517,99 @@ function ManagerIssueDetailsContent() {
                 </div>
               )}
             </section>
+
+            <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-lg font-bold text-gray-900">
+                Status history
+              </h2>
+              {issue.status_history.length > 0 ? (
+                <ol className="mt-5 space-y-4">
+                  {issue.status_history.map((event) => (
+                    <li key={event.id} className="flex gap-3">
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-[#0F766E]">
+                        <CheckCircle2 size={16} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {event.previous_status
+                            ? `${formatStatus(event.previous_status)} → `
+                            : ""}
+                          {formatStatus(event.new_status)}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {event.changed_by_name} · {formatDate(event.created_at)}
+                        </p>
+                        {event.public_message && (
+                          <p className="mt-1 text-sm text-gray-600">
+                            {event.public_message}
+                          </p>
+                        )}
+                        {event.internal_reason && (
+                          <p className="mt-1 rounded bg-amber-50 p-2 text-sm text-amber-800">
+                            Internal reason: {event.internal_reason}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-3 text-sm text-gray-500">
+                  No status changes have been recorded for this issue yet.
+                </p>
+              )}
+            </section>
+
+            {issue.work_notes.length > 0 && (
+              <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+                <h2 className="text-lg font-bold text-gray-900">
+                  Maintenance notes
+                </h2>
+                <ul className="mt-4 space-y-3">
+                  {issue.work_notes.map((workNote) => (
+                    <li
+                      key={workNote.id}
+                      className="rounded-xl bg-gray-50 p-4"
+                    >
+                      <p className="whitespace-pre-wrap text-sm text-gray-700">
+                        {workNote.note}
+                      </p>
+                      <p className="mt-2 text-xs text-gray-400">
+                        {workNote.staff_name || "Staff"} · {formatDate(workNote.created_at)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {issue.completion_photos.length > 0 && (
+              <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+                <h2 className="text-lg font-bold text-gray-900">
+                  Completion photos
+                </h2>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {issue.completion_photos.map((photo) => (
+                    <a
+                      key={photo.id}
+                      href={photo.image_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group"
+                    >
+                      <img
+                        src={photo.image_url}
+                        alt={`Completion evidence submitted by ${photo.uploaded_by_name || "staff"}`}
+                        className="aspect-square w-full rounded-lg object-cover"
+                      />
+                      <span className="mt-1 block text-xs text-gray-500">
+                        {photo.uploaded_by_name || "Staff"} · {formatDate(photo.created_at)}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Location */}
             <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">

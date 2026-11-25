@@ -15,6 +15,7 @@ import { Button, Drawer } from "@heroui/react";
 
 import {
   ChevronRight,
+  ClipboardList,
   HardHat,
 } from "lucide-react";
 
@@ -128,6 +129,11 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
             href: "/dashboard/admin/departments",
             icon: House,
           },
+          {
+            label: "Issue Management",
+            href: "/dashboard/admin/issues",
+            icon: Envelope,
+          },
         ],
       },
     ],
@@ -157,6 +163,11 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
             href: "/dashboard/department-manager/department-issues",
             icon: Envelope,
           },
+          {
+            label: "Team Management",
+            href: "/dashboard/department-manager/team",
+            icon: Person,
+          },
         ],
       },
     ],
@@ -180,6 +191,21 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
             label: "Dashboard",
             href: "/dashboard/maintenance-staff",
             icon: House,
+          },
+          {
+            label: "My Tasks",
+            href: "/dashboard/maintenance-staff/tasks",
+            icon: ClipboardList,
+          },
+        ],
+      },
+      {
+        title: "Account",
+        items: [
+          {
+            label: "Profile Settings",
+            href: "/dashboard/maintenance-staff/profile",
+            icon: Person,
           },
         ],
       },

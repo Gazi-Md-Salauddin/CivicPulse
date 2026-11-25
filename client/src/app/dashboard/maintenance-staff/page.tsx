@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
   AlertCircle,
-  ArrowDownRight,
-  ArrowRight,
   ArrowUpRight,
   CalendarDays,
   CheckCircle2,
@@ -15,26 +13,21 @@ import {
   Clock3,
   ClipboardList,
   Filter,
-  HardHat,
   MapPin,
   Menu,
-  MoreHorizontal,
-  Plus,
   Search,
-  Settings,
-  ShieldCheck,
-  Timer,
   TrendingUp,
   Wrench,
-  XCircle,
   X,
 } from "lucide-react";
+import {
+  getMaintenanceDashboard,
+  getMaintenanceIssues,
+  updateMaintenanceIssueStatus,
+  type WorkflowIssue,
+} from "@/services/issue-workflow.service";
 
-type TaskStatus =
-  | "Assigned"
-  | "In Progress"
-  | "Resolved"
-  | "Under Review";
+type TaskStatus = "Assigned" | "In Progress" | "Resolved" | "Closed";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
@@ -43,64 +36,11 @@ type Task = {
   title: string;
   category: string;
   location: string;
-  priority: Priority;
+  priority: Priority | null;
   status: TaskStatus;
   assignedDate: string;
-  dueDate: string;
+  assignedAt: string;
 };
-
-const initialTasks: Task[] = [
-  {
-    id: "CP-00124",
-    title: "Repair damaged road near Main Market",
-    category: "Road Damage",
-    location: "Mirpur 10, Dhaka",
-    priority: "Critical",
-    status: "In Progress",
-    assignedDate: "23 Nov 2026",
-    dueDate: "24 Nov 2026",
-  },
-  {
-    id: "CP-00121",
-    title: "Streetlight not working",
-    category: "Streetlight",
-    location: "Uttara Sector 7, Dhaka",
-    priority: "High",
-    status: "Assigned",
-    assignedDate: "22 Nov 2026",
-    dueDate: "25 Nov 2026",
-  },
-  {
-    id: "CP-00118",
-    title: "Blocked drainage system",
-    category: "Drainage",
-    location: "Dhanmondi 27, Dhaka",
-    priority: "High",
-    status: "In Progress",
-    assignedDate: "21 Nov 2026",
-    dueDate: "24 Nov 2026",
-  },
-  {
-    id: "CP-00115",
-    title: "Broken footpath tiles",
-    category: "Footpath",
-    location: "Mohammadpur, Dhaka",
-    priority: "Medium",
-    status: "Assigned",
-    assignedDate: "20 Nov 2026",
-    dueDate: "27 Nov 2026",
-  },
-  {
-    id: "CP-00110",
-    title: "Garbage collection point cleanup",
-    category: "Waste Management",
-    location: "Banani, Dhaka",
-    priority: "Low",
-    status: "Resolved",
-    assignedDate: "19 Nov 2026",
-    dueDate: "23 Nov 2026",
-  },
-];
 
 const priorityStyles: Record<Priority, string> = {
   Critical: "bg-red-50 text-red-700 border-red-100",
@@ -113,15 +53,79 @@ const statusStyles: Record<TaskStatus, string> = {
   Assigned: "bg-blue-50 text-blue-700",
   "In Progress": "bg-cyan-50 text-cyan-700",
   Resolved: "bg-emerald-50 text-emerald-700",
-  "Under Review": "bg-amber-50 text-amber-700",
+  Closed: "bg-gray-100 text-gray-600",
 };
 
+const formatDate = (date: string) =>
+  new Date(date).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+const mapTask = (issue: WorkflowIssue): Task => ({
+  id: issue.id,
+  title: issue.title,
+  category: issue.category,
+  location: issue.location_address || "Location not provided",
+  priority: issue.priority
+    ? (issue.priority.charAt(0).toUpperCase() +
+        issue.priority.slice(1)) as Priority
+    : null,
+  status:
+    issue.status === "in_progress"
+      ? "In Progress"
+      : issue.status === "resolved"
+        ? "Resolved"
+        : issue.status === "closed"
+          ? "Closed"
+        : "Assigned",
+  assignedDate: formatDate(issue.assigned_at || issue.created_at),
+  assignedAt: issue.assigned_at || issue.created_at,
+});
+
 export default function MaintenanceStaffDashboard() {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [dashboardStats, setDashboardStats] = useState({
+    total_assigned: 0,
+    pending: 0,
+    in_progress: 0,
+    resolved: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [savingTaskId, setSavingTaskId] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [mobileMenu, setMobileMenu] = useState(false);
+
+  const fetchDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [dashboardResponse, issuesResponse] = await Promise.all([
+        getMaintenanceDashboard(),
+        getMaintenanceIssues(),
+      ]);
+      setDashboardStats(dashboardResponse.data);
+      setTasks(issuesResponse.data.map(mapTask));
+    } catch (fetchError) {
+      setError(
+        fetchError instanceof Error
+          ? fetchError.message
+          : "Unable to load assigned maintenance tasks."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void fetchDashboard(), 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchDashboard]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -140,10 +144,22 @@ export default function MaintenanceStaffDashboard() {
     });
   }, [tasks, search, statusFilter, priorityFilter]);
 
+  const recentTasks = useMemo(
+    () =>
+      [...tasks]
+        .sort(
+          (first, second) =>
+            new Date(second.assignedAt).getTime() -
+            new Date(first.assignedAt).getTime()
+        )
+        .slice(0, 3),
+    [tasks]
+  );
+
   const stats = [
     {
       title: "Assigned Tasks",
-      value: tasks.filter((t) => t.status !== "Resolved").length,
+      value: dashboardStats.pending + dashboardStats.in_progress,
       description: "Total active assignments",
       icon: <ClipboardList size={21} />,
       color: "bg-teal-50 text-[#0F766E]",
@@ -151,7 +167,7 @@ export default function MaintenanceStaffDashboard() {
     },
     {
       title: "Pending Tasks",
-      value: tasks.filter((t) => t.status === "Assigned").length,
+      value: dashboardStats.pending,
       description: "Waiting to be started",
       icon: <Clock3 size={21} />,
       color: "bg-amber-50 text-amber-600",
@@ -159,7 +175,7 @@ export default function MaintenanceStaffDashboard() {
     },
     {
       title: "In Progress",
-      value: tasks.filter((t) => t.status === "In Progress").length,
+      value: dashboardStats.in_progress,
       description: "Currently working",
       icon: <Wrench size={21} />,
       color: "bg-blue-50 text-blue-600",
@@ -167,7 +183,7 @@ export default function MaintenanceStaffDashboard() {
     },
     {
       title: "Completed Tasks",
-      value: tasks.filter((t) => t.status === "Resolved").length,
+      value: dashboardStats.resolved,
       description: "Successfully resolved",
       icon: <CheckCircle2 size={21} />,
       color: "bg-emerald-50 text-emerald-600",
@@ -175,80 +191,28 @@ export default function MaintenanceStaffDashboard() {
     },
   ];
 
-  const updateTaskStatus = (id: string, status: TaskStatus) => {
-    setTasks((previous) =>
-      previous.map((task) =>
-        task.id === id ? { ...task, status } : task
-      )
-    );
-  };
-
-  const handleStartWork = (task: Task) => {
-    updateTaskStatus(task.id, "In Progress");
-  };
-
-  const handleCompleteWork = (task: Task) => {
-    updateTaskStatus(task.id, "Resolved");
+  const handleTaskStatus = async (
+    task: Task,
+    status: "in_progress" | "resolved"
+  ) => {
+    try {
+      setSavingTaskId(task.id);
+      setActionError("");
+      await updateMaintenanceIssueStatus(task.id, status);
+      await fetchDashboard();
+    } catch (actionFailure) {
+      setActionError(
+        actionFailure instanceof Error
+          ? actionFailure.message
+          : "Unable to update this task."
+      );
+    } finally {
+      setSavingTaskId("");
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#F5FAF9]">
-
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMobileMenu(!mobileMenu)}
-              className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
-              aria-label="Toggle navigation"
-            >
-              {mobileMenu ? <X size={21} /> : <Menu size={21} />}
-            </button>
-
-            <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0F766E] text-lg font-bold text-white">
-                C
-              </div>
-              <span className="text-lg font-bold text-[#134E4A]">
-                CivicPulse
-              </span>
-            </Link>
-
-            <span className="hidden h-6 border-l border-gray-200 sm:block" />
-
-            <span className="hidden text-sm font-medium text-gray-500 sm:block">
-              Maintenance Portal
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              className="relative rounded-lg p-2 text-gray-500 hover:bg-gray-100"
-              aria-label="Notifications"
-            >
-              <Activity size={20} />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
-            </button>
-
-            <button className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-gray-50">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#CCFBF1] text-sm font-bold text-[#0F766E]">
-                MS
-              </div>
-              <div className="hidden text-left sm:block">
-                <p className="text-sm font-semibold text-gray-800">
-                  Maintenance Staff
-                </p>
-                <p className="text-xs text-gray-400">
-                  Field Technician
-                </p>
-              </div>
-              <ChevronDown size={15} className="hidden text-gray-400 sm:block" />
-            </button>
-          </div>
-        </div>
-      </header>
 
       <div className="relative flex">
         
@@ -278,19 +242,53 @@ export default function MaintenanceStaffDashboard() {
                 </div>
 
                 <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-                  Good morning, Staff Member!
+                  Maintenance dashboard
                 </h1>
 
                 <p className="mt-2 text-sm text-gray-500">
-                  Here's an overview of your maintenance activities.
+                  Here is an overview of your maintenance activities.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                <CalendarDays size={17} className="text-[#0F766E]" />
-                Monday, November 23, 2026
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+                  <CalendarDays size={17} className="text-[#0F766E]" />
+                  {new Date().toLocaleDateString("en-GB", {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </div>
+                <button
+                  onClick={() => void fetchDashboard()}
+                  disabled={loading}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 disabled:opacity-50"
+                >
+                  Refresh
+                </button>
               </div>
             </div>
+
+            {error && (
+              <div className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+                <button
+                  onClick={() => void fetchDashboard()}
+                  className="shrink-0 font-semibold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            {actionError && (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {actionError}
+              </div>
+            )}
 
             {/* Statistics */}
             <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -343,7 +341,8 @@ export default function MaintenanceStaffDashboard() {
                       const count = tasks.filter(
                         (task) =>
                           task.priority === priority &&
-                          task.status !== "Resolved"
+                          task.status !== "Resolved" &&
+                          task.status !== "Closed"
                       ).length;
 
                       return (
@@ -419,7 +418,7 @@ export default function MaintenanceStaffDashboard() {
                 </div>
 
                 <p className="mt-4 text-xs text-teal-200">
-                  Based on the tasks currently displayed.
+                  Based on your assigned tasks.
                 </p>
               </div>
             </div>
@@ -437,12 +436,9 @@ export default function MaintenanceStaffDashboard() {
                   </p>
                 </div>
 
-                <Link
-                  href="/dashboard/maintenance-staff/tasks"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-[#0F766E] hover:underline"
-                >
-                  View All Tasks <ArrowRight size={16} />
-                </Link>
+                <span className="text-sm font-semibold text-gray-500">
+                  {tasks.length} assigned
+                </span>
               </div>
 
               {/* Filters */}
@@ -475,7 +471,7 @@ export default function MaintenanceStaffDashboard() {
                       <option value="Assigned">Assigned</option>
                       <option value="In Progress">In Progress</option>
                       <option value="Resolved">Resolved</option>
-                      <option value="Under Review">Under Review</option>
+                      <option value="Closed">Closed</option>
                     </select>
                   </div>
 
@@ -501,7 +497,7 @@ export default function MaintenanceStaffDashboard() {
                       <th className="px-5 py-4 font-semibold">Task Details</th>
                       <th className="px-5 py-4 font-semibold">Priority</th>
                       <th className="px-5 py-4 font-semibold">Status</th>
-                      <th className="px-5 py-4 font-semibold">Due Date</th>
+                      <th className="px-5 py-4 font-semibold">Assigned Date</th>
                       <th className="px-5 py-4 text-right font-semibold">Action</th>
                     </tr>
                   </thead>
@@ -526,9 +522,15 @@ export default function MaintenanceStaffDashboard() {
                         </td>
 
                         <td className="px-5 py-4">
-                          <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${priorityStyles[task.priority]}`}>
-                            {task.priority}
-                          </span>
+                          {task.priority ? (
+                            <span className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${priorityStyles[task.priority]}`}>
+                              {task.priority}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">
+                              Not set
+                            </span>
+                          )}
                         </td>
 
                         <td className="px-5 py-4">
@@ -539,10 +541,10 @@ export default function MaintenanceStaffDashboard() {
 
                         <td className="px-5 py-4">
                           <p className="text-sm font-medium text-gray-700">
-                            {task.dueDate}
+                            {task.assignedDate}
                           </p>
                           <p className="mt-1 text-xs text-gray-400">
-                            Due date
+                            Assigned
                           </p>
                         </td>
 
@@ -558,7 +560,8 @@ export default function MaintenanceStaffDashboard() {
 
                             {task.status === "Assigned" && (
                               <button
-                                onClick={() => handleStartWork(task)}
+                                disabled={savingTaskId === task.id}
+                                onClick={() => void handleTaskStatus(task, "in_progress")}
                                 className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#115E59]"
                               >
                                 Start Work
@@ -567,7 +570,8 @@ export default function MaintenanceStaffDashboard() {
 
                             {task.status === "In Progress" && (
                               <button
-                                onClick={() => handleCompleteWork(task)}
+                                disabled={savingTaskId === task.id}
+                                onClick={() => void handleTaskStatus(task, "resolved")}
                                 className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
                               >
                                 Complete
@@ -578,7 +582,14 @@ export default function MaintenanceStaffDashboard() {
                       </tr>
                     ))}
 
-                    {filteredTasks.length === 0 && (
+                    {loading && (
+                      <tr>
+                        <td colSpan={5} className="px-5 py-12 text-center text-sm text-gray-500">
+                          Loading assigned tasks...
+                        </td>
+                      </tr>
+                    )}
+                    {!loading && filteredTasks.length === 0 && (
                       <tr>
                         <td
                           colSpan={5}
@@ -609,9 +620,15 @@ export default function MaintenanceStaffDashboard() {
                         </h3>
                       </div>
 
-                      <span className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold ${priorityStyles[task.priority]}`}>
-                        {task.priority}
-                      </span>
+                      {task.priority ? (
+                        <span className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold ${priorityStyles[task.priority]}`}>
+                          {task.priority}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[10px] text-gray-400">
+                          Not set
+                        </span>
+                      )}
                     </div>
 
                     <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
@@ -626,7 +643,8 @@ export default function MaintenanceStaffDashboard() {
 
                       {task.status === "Assigned" && (
                         <button
-                          onClick={() => handleStartWork(task)}
+                          disabled={savingTaskId === task.id}
+                          onClick={() => void handleTaskStatus(task, "in_progress")}
                           className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white"
                         >
                           Start Work
@@ -635,7 +653,8 @@ export default function MaintenanceStaffDashboard() {
 
                       {task.status === "In Progress" && (
                         <button
-                          onClick={() => handleCompleteWork(task)}
+                          disabled={savingTaskId === task.id}
+                          onClick={() => void handleTaskStatus(task, "resolved")}
                           className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
                         >
                           Complete
@@ -652,7 +671,11 @@ export default function MaintenanceStaffDashboard() {
                   </div>
                 ))}
 
-                {filteredTasks.length === 0 && (
+                {loading ? (
+                  <div className="py-10 text-center text-sm text-gray-500">
+                    Loading assigned tasks...
+                  </div>
+                ) : filteredTasks.length === 0 && (
                   <div className="py-10 text-center text-sm text-gray-500">
                     No tasks found.
                   </div>
@@ -660,138 +683,48 @@ export default function MaintenanceStaffDashboard() {
               </div>
             </section>
 
-            {/* Bottom Section */}
-            <div className="mt-7 grid grid-cols-1 gap-5 lg:grid-cols-2">
-
-              {/* Today's Schedule */}
-              <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <h2 className="font-bold text-gray-900">
-                      Today's Schedule
-                    </h2>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Your planned maintenance activities
-                    </p>
-                  </div>
-                  <CalendarDays size={19} className="text-[#0F766E]" />
+            <section className="mt-7 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-gray-900">
+                    Recently assigned
+                  </h2>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Latest work from your assigned task list
+                  </p>
                 </div>
-
+                <Activity size={19} className="text-[#0F766E]" />
+              </div>
+              {recentTasks.length ? (
                 <div className="space-y-4">
-                  {[
-                    {
-                      time: "09:00 AM",
-                      title: "Road damage inspection",
-                      location: "Mirpur 10",
-                      status: "In Progress",
-                    },
-                    {
-                      time: "11:30 AM",
-                      title: "Drainage maintenance",
-                      location: "Dhanmondi 27",
-                      status: "Upcoming",
-                    },
-                    {
-                      time: "03:00 PM",
-                      title: "Streetlight inspection",
-                      location: "Uttara Sector 7",
-                      status: "Upcoming",
-                    },
-                  ].map((item) => (
-                    <div
-                      key={item.time}
-                      className="flex gap-3 border-b border-gray-100 pb-4 last:border-0 last:pb-0"
+                  {recentTasks.map((task) => (
+                    <Link
+                      key={task.id}
+                      href={`/dashboard/maintenance-staff/tasks/${task.id}`}
+                      className="flex flex-col gap-2 border-b border-gray-100 pb-4 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div className="w-20 shrink-0">
-                        <p className="text-xs font-semibold text-[#0F766E]">
-                          {item.time}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-800">
+                          {task.title}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {task.location} · Assigned {task.assignedDate}
                         </p>
                       </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-800">
-                          {item.title}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-400">
-                          {item.location}
-                        </p>
-                      </div>
-
-                      <span className={`h-fit rounded-md px-2 py-1 text-[10px] font-semibold ${
-                        item.status === "In Progress"
-                          ? "bg-cyan-50 text-cyan-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}>
-                        {item.status}
+                      <span
+                        className={`w-fit rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[task.status]}`}
+                      >
+                        {task.status}
                       </span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
-              </section>
-
-              {/* Recent Activity */}
-              <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <h2 className="font-bold text-gray-900">
-                      Recent Activity
-                    </h2>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Latest maintenance updates
-                    </p>
-                  </div>
-                  <Activity size={19} className="text-[#0F766E]" />
-                </div>
-
-                <div className="space-y-5">
-                  {[
-                    {
-                      icon: <CheckCircle2 size={16} />,
-                      color: "bg-emerald-50 text-emerald-600",
-                      title: "Task marked as resolved",
-                      detail: "CP-00110 · Garbage collection cleanup",
-                      time: "Today",
-                    },
-                    {
-                      icon: <Wrench size={16} />,
-                      color: "bg-blue-50 text-blue-600",
-                      title: "Maintenance work started",
-                      detail: "CP-00118 · Blocked drainage system",
-                      time: "Yesterday",
-                    },
-                    {
-                      icon: <ClipboardList size={16} />,
-                      color: "bg-amber-50 text-amber-600",
-                      title: "New task assigned",
-                      detail: "CP-00124 · Road damage",
-                      time: "2 days ago",
-                    },
-                  ].map((activity) => (
-                    <div
-                      key={activity.title}
-                      className="flex items-start gap-3"
-                    >
-                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${activity.color}`}>
-                        {activity.icon}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-800">
-                          {activity.title}
-                        </p>
-                        <p className="mt-1 truncate text-xs text-gray-400">
-                          {activity.detail}
-                        </p>
-                      </div>
-
-                      <span className="shrink-0 text-[10px] text-gray-400">
-                        {activity.time}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
+              ) : (
+                <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
+                  No assigned tasks are available yet.
+                </p>
+              )}
+            </section>
           </div>
         </main>
       </div>

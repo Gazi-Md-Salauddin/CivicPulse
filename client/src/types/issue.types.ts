@@ -33,6 +33,7 @@ export interface IIssue {
   location_address: string;
   latitude: number | null;
   longitude: number | null;
+  priority?: "low" | "medium" | "high" | "critical" | null;
   status: string;
   reporter_id: string;
   created_at: string;

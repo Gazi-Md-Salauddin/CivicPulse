@@ -15,7 +15,7 @@ export const createIssue = async (
 
 
 // Get citizen own issue
-export const getIssues = async (): Promise<IIssueResponse> => {
+export const getIssues = async (): Promise<IGetIssuesResponse> => {
   const response = await fetch(apiUrl("issue"), {
     method: "GET",
     credentials: "include",
@@ -24,7 +24,7 @@ export const getIssues = async (): Promise<IIssueResponse> => {
     },
   });
 
-  return parseApiResponse<IIssueResponse>(response);
+  return parseApiResponse<IGetIssuesResponse>(response);
 };
 
 

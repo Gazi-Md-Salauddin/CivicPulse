@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import {
   Camera,
@@ -9,6 +9,7 @@ import {
   Mail,
   MapPin,
   Save,
+  Trash2,
   X,
   ShieldCheck,
   LoaderCircle,
@@ -27,30 +28,29 @@ export interface IProfileUpdateData {
   name: string;
   address: string;
   image: File | null;
+  removeImage: boolean;
 }
 
 interface ProfileProps {
   user: IProfileUser;
   onSave: (data: IProfileUpdateData) => Promise<void> | void;
+  allowImageChange?: boolean;
 }
 
-export default function Profile({ user, onSave }: ProfileProps) {
+export default function Profile({
+  user,
+  onSave,
+  allowImageChange = true,
+}: ProfileProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState(user.name);
   const [address, setAddress] = useState(user.address ?? "");
   const [imagePreview, setImagePreview] = useState(user.image ?? "");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    setName(user.name);
-    setAddress(user.address ?? "");
-    setImagePreview(user.image ?? "");
-    setImageFile(null);
-    setError("");
-  }, [user]);
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,6 +71,7 @@ export default function Profile({ user, onSave }: ProfileProps) {
 
     setError("");
     setImageFile(file);
+    setRemoveImage(false);
 
     const reader = new FileReader();
 
@@ -88,6 +89,7 @@ export default function Profile({ user, onSave }: ProfileProps) {
     setAddress(user.address ?? "");
     setImagePreview(user.image ?? "");
     setImageFile(null);
+    setRemoveImage(false);
     setError("");
 
     if (fileInputRef.current) {
@@ -111,6 +113,7 @@ export default function Profile({ user, onSave }: ProfileProps) {
         name: name.trim(),
         address: address.trim(),
         image: imageFile,
+        removeImage,
       });
     } catch {
       setError("Unable to update profile. Please try again.");
@@ -155,22 +158,45 @@ export default function Profile({ user, onSave }: ProfileProps) {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="Change profile photo"
-                className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-white bg-[#0F766E] text-white shadow-md transition hover:bg-[#115E59]"
-              >
-                <Camera size={18} />
-              </button>
+              {allowImageChange && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label="Change profile photo"
+                    className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-white bg-[#0F766E] text-white shadow-md transition hover:bg-[#115E59]"
+                  >
+                    <Camera size={18} />
+                  </button>
+                  {imagePreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImagePreview("");
+                        setImageFile(null);
+                        setRemoveImage(true);
+                        setError("");
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
+                      }}
+                      aria-label="Remove profile photo"
+                      title="Remove profile photo"
+                      className="absolute -bottom-2 left-0 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-white bg-red-600 text-white shadow-md transition hover:bg-red-700"
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  )}
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={handleImageChange}
-                className="hidden"
-              />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </>
+              )}
             </div>
 
             {/* User Summary */}
@@ -189,9 +215,11 @@ export default function Profile({ user, onSave }: ProfileProps) {
             </div>
           </div>
 
-          <p className="mt-4 text-xs text-slate-400">
-            JPG, PNG or WEBP. Maximum file size 5MB.
-          </p>
+          {allowImageChange && (
+            <p className="mt-4 text-xs text-slate-400">
+              JPG, PNG or WEBP. Maximum file size 5MB.
+            </p>
+          )}
         </div>
       </div>
 

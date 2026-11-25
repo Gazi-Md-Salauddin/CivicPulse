@@ -34,6 +34,7 @@ type Issue = {
   latitude: number | null;
   longitude: number | null;
   reporter_id: string;
+  priority: "low" | "medium" | "high" | "critical" | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -68,6 +69,7 @@ const statuses = [
   "In Progress",
   "Resolved",
   "Closed",
+  "Rejected",
 ];
 
 function getStatusStyle(status: string) {
@@ -84,6 +86,8 @@ function getStatusStyle(status: string) {
       return "bg-emerald-50 text-emerald-700 border-emerald-200";
     case "closed":
       return "bg-gray-100 text-gray-600 border-gray-200";
+    case "rejected":
+      return "bg-red-50 text-red-700 border-red-200";
     default:
       return "bg-gray-100 text-gray-600 border-gray-200";
   }
