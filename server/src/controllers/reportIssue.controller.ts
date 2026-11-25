@@ -6,6 +6,11 @@ import {
   getIssues,
 } from "../models/reportIssue.model.js";
 import { IssueWorkflowError } from "../lib/issueWorkflow.js";
+import { isValidIssueCoordinatePair } from "../lib/issueCoordinates.js";
+import {
+  AddressSearchError,
+  searchNominatim,
+} from "../lib/nominatim.js";
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -44,21 +49,11 @@ export const createIssueController = async (
       });
     }
 
-    if (
-      (latitude !== undefined &&
-        (typeof latitude !== "number" ||
-          !Number.isFinite(latitude) ||
-          latitude < -90 ||
-          latitude > 90)) ||
-      (longitude !== undefined &&
-        (typeof longitude !== "number" ||
-          !Number.isFinite(longitude) ||
-          longitude < -180 ||
-          longitude > 180))
-    ) {
+    if (!isValidIssueCoordinatePair(latitude, longitude)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid GPS coordinates.",
+        message:
+          "Provide both latitude and longitude within valid geographic ranges.",
       });
     }
 
@@ -68,8 +63,8 @@ export const createIssueController = async (
       category: category.trim(),
       image_url,
       location_address: location_address.trim(),
-      latitude,
-      longitude,
+      latitude: latitude ?? undefined,
+      longitude: longitude ?? undefined,
       reporter_id: res.locals.session.user.id,
     });
 
@@ -92,6 +87,43 @@ export const createIssueController = async (
     return res.status(500).json({
       success: false,
       message: "Failed to report issue.",
+    });
+  }
+};
+
+export const searchIssueLocationController = async (
+  req: Request,
+  res: Response
+) => {
+  const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+  if (query.length < 3 || query.length > 200) {
+    return res.status(400).json({
+      success: false,
+      message: "Search text must be between 3 and 200 characters.",
+    });
+  }
+
+  try {
+    const results = await searchNominatim(query);
+
+    return res.status(200).json({
+      success: true,
+      message: "Location search completed.",
+      data: results,
+    });
+  } catch (error) {
+    if (error instanceof AddressSearchError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error("Issue location search failed:", error);
+    return res.status(503).json({
+      success: false,
+      message: "Address search is temporarily unavailable.",
     });
   }
 };

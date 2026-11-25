@@ -4,6 +4,7 @@ import {
   getCitizenIssueDetailsController,
   getCitizenIssueHistoryController,
   getIssuesController,
+  searchIssueLocationController,
 } from "../controllers/reportIssue.controller.js";
 import { requireAuth, requireCitizen } from "../middlewares/auth.middleware.js";
 
@@ -13,6 +14,7 @@ router.use(requireAuth, requireCitizen);
 
 router.post("/", createIssueController);
 
+router.get("/location/search", searchIssueLocationController);
 router.get("/", getIssuesController);
 router.get("/:issueId/history", getCitizenIssueHistoryController);
 router.get("/:issueId", getCitizenIssueDetailsController);
