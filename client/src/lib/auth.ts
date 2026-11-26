@@ -1,22 +1,66 @@
+
 import { NextRequest, NextResponse } from "next/server";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-export const forwardAuthRequest = (request: NextRequest) => {
+export async function forwardAuthRequest(request: NextRequest) {
   if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL is not configured");
+    return NextResponse.json(
+      { message: "NEXT_PUBLIC_API_URL is not configured" },
+      { status: 500 }
+    );
   }
 
   const apiUrl = new URL(API_URL);
-  const apiPath = apiUrl.pathname.replace(/\/+$/, "");
-  const authPath = request.nextUrl.pathname.replace(
-    /^\/api\/auth(?=\/|$)/,
-    ""
-  );
+
+  // /api/auth/sign-in/email
+  // -> /api/auth/sign-in/email on Render
   const targetUrl = new URL(
-    `${apiPath}${authPath}${request.nextUrl.search}`,
+    `${apiUrl.pathname.replace(/\/+$/, "")}${request.nextUrl.pathname.replace(/^\/api/, "")}${request.nextUrl.search}`,
     apiUrl.origin
   );
 
-  return NextResponse.redirect(targetUrl, 307);
-};
+  const headers = new Headers(request.headers);
+
+  headers.delete("host");
+  headers.delete("connection");
+  headers.delete("content-length");
+
+  const backendResponse = await fetch(targetUrl, {
+    method: request.method,
+    headers,
+    body:
+      request.method !== "GET" && request.method !== "HEAD"
+        ? await request.arrayBuffer()
+        : undefined,
+    redirect: "manual",
+    cache: "no-store",
+  });
+
+  const responseHeaders = new Headers(backendResponse.headers);
+
+  responseHeaders.delete("content-encoding");
+  responseHeaders.delete("content-length");
+  responseHeaders.delete("transfer-encoding");
+
+  const cookies = backendResponse.headers.getSetCookie();
+
+  responseHeaders.delete("set-cookie");
+
+  const response = new NextResponse(
+    backendResponse.status === 204 ||
+      backendResponse.status === 304
+      ? null
+      : backendResponse.body,
+    {
+      status: backendResponse.status,
+      headers: responseHeaders,
+    }
+  );
+
+  for (const cookie of cookies) {
+    response.headers.append("Set-Cookie", cookie);
+  }
+
+  return response;
+}

@@ -261,6 +261,95 @@ export default function LoginPage() {
               </form>
 
 
+              {/* Demo Accounts */}
+              <div className="mt-7">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">
+                      Explore Demo Accounts
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Choose a role to explore CivicPulse.
+                    </p>
+                  </div>
+
+                  <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-bold text-[#0F766E]">
+                    4 DEMO ROLES
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                  {[
+                    {
+                      role: "Citizen",
+                      email: "citizen@gmail.com",
+                      password: "*Citizen1234#",
+                      icon: Users,
+                    },
+                    {
+                      role: "Maintenance Staff",
+                      email: "staff12@gmail.com",
+                      password: "*Staff1234#",
+                      icon: Activity,
+                    },
+                    {
+                      role: "Department Manager",
+                      email: "manager@gmail.com",
+                      password: "*Manager1234#",
+                      icon: Building2,
+                    },
+                    {
+                      role: "Admin",
+                      email: "admin@gmail.com",
+                      password: "*Admin1234#",
+                      icon: ShieldCheck,
+                    },
+                  ].map((demo) => {
+                    const Icon = demo.icon;
+
+                    return (
+                      <div
+                        key={demo.role}
+                        className="rounded-xl border border-slate-200 bg-white p-3.5 transition hover:border-teal-300 hover:bg-teal-50/30"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-[#0F766E]">
+                            <Icon size={18} />
+                          </div>
+
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-800">
+                              {demo.role}
+                            </h4>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() =>
+                            setFormData({
+                              email: demo.email,
+                              password: demo.password,
+                            })
+                          }
+                          className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 text-xs font-bold text-[#0F766E] transition hover:bg-[#0F766E] hover:text-white disabled:opacity-50"
+                        >
+                          Continue as {demo.role}
+                          <ArrowRight size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-3 text-center text-[10px] text-slate-400">
+                  Demo credentials are provided for testing purposes only.
+                </p>
+              </div>
+
+
 
               <p className="mt-8 text-center text-sm text-slate-500">
                 Don't have an account?{" "}
