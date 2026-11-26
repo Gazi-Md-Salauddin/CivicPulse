@@ -1,12 +1,15 @@
+
 import { betterAuth } from "better-auth";
 import pool from "../config/db.js";
-
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
 
+  basePath: "/api/auth",
+
   trustedOrigins: [
-    process.env.NEXT_PUBLIC_URL || 'http://localhost:3000',
+    "https://civicpulse-teal-nine.vercel.app",
+    "http://localhost:3000",
   ],
 
   database: pool,
@@ -16,10 +19,13 @@ export const auth = betterAuth({
   },
 
   advanced: {
+    useSecureCookies: true,
+
     defaultCookieAttributes: {
-      sameSite: "none",
+      sameSite: "lax",
       secure: true,
       httpOnly: true,
+      path: "/",
     },
   },
 
