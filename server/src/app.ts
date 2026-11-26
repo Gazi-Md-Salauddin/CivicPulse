@@ -49,7 +49,7 @@ app.use("/api/admin/departments", departmentRoutes);
 app.use("/api/admin/issues", adminIssueRoutes);
 
 // BetterAuth route
-app.all("/api/*splat", toNodeHandler(auth));
+app.all("/api/auth/*splat", toNodeHandler(auth));
 
 const apiErrorHandler: ErrorRequestHandler = (
   error,
