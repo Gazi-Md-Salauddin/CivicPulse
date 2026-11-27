@@ -1,3 +1,4 @@
+
 import type {
   Request,
   Response,
@@ -5,8 +6,12 @@ import type {
   RequestHandler,
 } from "express";
 
-import { fromNodeHeaders } from "better-auth/node";
-import { auth } from "../lib/auth.js";
+import {
+  createRemoteJWKSet,
+  jwtVerify,
+  type JWTPayload,
+} from "jose";
+
 import pool from "../config/db.js";
 
 // Supported user roles
@@ -16,65 +21,113 @@ export type UserRole =
   | "maintenance_staff"
   | "citizen";
 
-// Better Auth session type
-type AuthSession = NonNullable<
-  Awaited<ReturnType<typeof auth.api.getSession>>
->;
+// Authenticated user information
+export interface AuthUser extends JWTPayload {
+  id: string;
+  email: string;
+  role: UserRole;
+}
 
 // Extend Express Locals
 declare global {
   namespace Express {
     interface Locals {
-      session: AuthSession;
+      user: AuthUser;
     }
   }
 }
 
-// Check authentication and account status
+// Better Auth JWKS endpoint
+const JWKS = createRemoteJWKSet(
+  new URL(process.env.AUTH_JWKS_URL!)
+);
+
+// Verify JWT and account status
 export const requireAuth: RequestHandler = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // 1. Verify Better Auth session
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers),
-    });
+    // 1. Extract JWT
+    const authHeader = req.headers.authorization;
 
-    if (!session) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized. Please login first.",
       });
     }
 
-    // 2. Check whether account is active
-    const userResult = await pool.query(
-      `SELECT is_active
-       FROM "user"
-       WHERE id = $1`,
-      [session.user.id]
-    );
+    const token = authHeader.slice(7).trim();
 
-    if (
-      !userResult.rows[0] ||
-      userResult.rows[0].is_active !== true
-    ) {
-      return res.status(403).json({
+    if (!token) {
+      return res.status(401).json({
         success: false,
-        message: "Your account is deactivated.",
+        message: "Invalid authentication token.",
       });
     }
 
-    // 3. Store authenticated session
-    res.locals.session = session;
+    // 2. Verify JWT
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: process.env.AUTH_URL,
+      audience: process.env.AUTH_URL,
+    });
+
+    if (
+      typeof payload.id !== "string" ||
+      typeof payload.email !== "string"
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token payload.",
+      });
+    }
+
+    // 3. Check account status and get trusted role
+    const userResult = await pool.query(
+      `SELECT id, email, role, is_active
+       FROM "user"
+       WHERE id = $1`,
+      [payload.id]
+    );
+
+    const user = userResult.rows[0];
+
+    if (!user || user.is_active !== true) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is deactivated or does not exist.",
+      });
+    }
+
+    // 4. Store authenticated user
+    res.locals.user = {
+      ...payload,
+      id: user.id,
+      email: user.email,
+      role: user.role as UserRole,
+    };
 
     next();
   } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === "JWTExpired" ||
+        error.name === "JWSSignatureVerificationFailed" ||
+        error.name === "JWTClaimValidationFailed" ||
+        error.name === "JWSInvalid" ||
+        error.name === "JWKSNoMatchingKey")
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired token.",
+      });
+    }
+
     console.error("Authentication Middleware Error:", error);
 
-    return res.status(500).json({
+    return res.status(401).json({
       success: false,
       message: "Authentication failed.",
     });
@@ -85,23 +138,21 @@ export const requireAuth: RequestHandler = async (
 export const authorizeRoles = (
   ...allowedRoles: UserRole[]
 ): RequestHandler => {
-  return (req, res, next) => {
-    const session = res.locals.session;
+  return (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const user = res.locals.user;
 
-    if (!session) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized. Please login first.",
       });
     }
 
-    const userRole = (
-      session.user as typeof session.user & {
-        role?: string;
-      }
-    ).role;
-
-    if (!userRole || !allowedRoles.includes(userRole as UserRole)) {
+    if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden. You do not have permission.",

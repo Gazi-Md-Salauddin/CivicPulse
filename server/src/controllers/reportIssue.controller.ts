@@ -65,7 +65,7 @@ export const createIssueController = async (
       location_address: location_address.trim(),
       latitude: latitude ?? undefined,
       longitude: longitude ?? undefined,
-      reporter_id: res.locals.session.user.id,
+      reporter_id: res.locals.user!.id,
     });
 
     return res.status(201).json({
@@ -134,7 +134,7 @@ export const getIssuesController = async (
   res: Response
 ) => {
   try {
-    const issues = await getIssues(res.locals.session.user.id);
+    const issues = await getIssues(res.locals.user!.id);
 
     return res.status(200).json({
       success: true,
@@ -165,7 +165,7 @@ export const getCitizenIssueDetailsController = async (
       });
     }
 
-    const reporterId = res.locals.session.user.id;
+    const reporterId = res.locals.user!.id;
     const issue = await getCitizenIssueDetails(issueId, reporterId);
 
     if (!issue) {
@@ -209,7 +209,7 @@ export const getCitizenIssueHistoryController = async (
       });
     }
 
-    const reporterId = res.locals.session.user.id;
+    const reporterId = res.locals.user!.id;
     const issue = await getCitizenIssueDetails(issueId, reporterId);
 
     if (!issue) {

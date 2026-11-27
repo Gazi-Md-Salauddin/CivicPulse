@@ -1,4 +1,3 @@
-
 import type { Request, Response } from "express";
 
 import {
@@ -52,7 +51,7 @@ export const getMaintenanceDashboardController = async (
   res: Response
 ) => {
   try {
-    const staffId = res.locals.session.user.id;
+    const staffId = res.locals.user.id;
 
     const stats = await getMaintenanceDashboard(staffId);
 
@@ -83,7 +82,7 @@ export const getAssignedIssuesController = async (
   res: Response
 ) => {
   try {
-    const staffId = res.locals.session.user.id;
+    const staffId = res.locals.user.id;
 
     const issues = await getAssignedIssues(staffId);
 
@@ -109,7 +108,7 @@ export const getAssignedIssueByIdController = async (
   res: Response
 ) => {
   try {
-    const staffId = res.locals.session.user.id;
+    const staffId = res.locals.user.id;
     const issueId = req.params.id;
 
     if (typeof issueId !== "string" || !isUuid(issueId)) {
@@ -150,7 +149,7 @@ export const updateAssignedIssueStatusController = async (
   res: Response
 ) => {
   try {
-    const staffId = res.locals.session.user.id;
+    const staffId = res.locals.user.id;
     const issueId = req.params.id;
 
     if (typeof issueId !== "string" || !isUuid(issueId)) {
@@ -240,7 +239,7 @@ export const uploadCompletionPhotosController = async (
   res: Response
 ) => {
   const issueId = req.params.id;
-  const staffId = res.locals.session.user.id;
+  const staffId = res.locals.user.id;
 
   if (typeof issueId !== "string" || !isUuid(issueId)) {
     return res.status(400).json({
@@ -354,7 +353,7 @@ export const addIssueWorkNoteController = async (
   res: Response
 ) => {
   try {
-    const staffId = res.locals.session.user.id;
+    const staffId = res.locals.user.id;
     const issueId = req.params.id;
 
     if (typeof issueId !== "string" || !isUuid(issueId)) {
@@ -411,7 +410,7 @@ export const getIssueWorkNotesController = async (
   res: Response
 ) => {
   try {
-    const staffId = res.locals.session.user.id;
+    const staffId = res.locals.user.id;
     const issueId = req.params.id;
 
     if (typeof issueId !== "string" || !isUuid(issueId)) {

@@ -47,7 +47,7 @@ export const managerDashboardController = async (
   res: Response
 ) => {
   try {
-    const managerId = res.locals.session?.user?.id;
+    const managerId = res.locals.user.id;
 
     if (!managerId) {
       return res.status(401).json({
@@ -90,7 +90,7 @@ export const managerIssuesController = async (
   res: Response
 ) => {
   try {
-    const managerId = res.locals.session?.user?.id;
+    const managerId = res.locals.user.id;
 
     if (!managerId) {
       return res.status(401).json({
@@ -184,7 +184,7 @@ export const managerIssueDetailsController = async (
   res: Response
 ) => {
   try {
-    const managerId = res.locals.session?.user?.id;
+    const managerId = res.locals.user.id;
     const issueId = req.params.issueId;
 
     if (!managerId) {
@@ -256,7 +256,7 @@ const transitionDepartmentIssue = async (
 
   try {
     const issue = await transitionManagerIssue(
-      res.locals.session.user.id,
+      res.locals.user.id,
       issueId,
       nextStatus,
       reason
@@ -310,7 +310,7 @@ export const setManagerIssuePriorityController = async (
 
   try {
     const issue = await updateManagerIssuePriority(
-      res.locals.session.user.id,
+      res.locals.user.id,
       issueId,
       priority
     );
@@ -348,7 +348,7 @@ export const assignManagerIssueController = async (
 
   try {
     const issue = await assignManagerIssue(
-      res.locals.session.user.id,
+      res.locals.user.id,
       issueId,
       staffId.trim()
     );
@@ -369,7 +369,7 @@ export const getManagerDepartmentStaffController = async (
 ) => {
   try {
     const data = await getManagerDepartmentStaff(
-      res.locals.session.user.id
+      res.locals.user.id
     );
 
     return res.status(200).json({
@@ -388,7 +388,7 @@ export const getManagerDepartmentStaffCandidatesController = async (
 ) => {
   try {
     const staff = await getManagerDepartmentStaffCandidates(
-      res.locals.session.user.id
+      res.locals.user.id
     );
 
     return res.status(200).json({
@@ -416,7 +416,7 @@ export const addManagerDepartmentStaffController = async (
 
   try {
     const staff = await addManagerDepartmentStaff(
-      res.locals.session.user.id,
+      res.locals.user.id,
       staffId.trim()
     );
 
@@ -445,7 +445,7 @@ export const deactivateManagerDepartmentStaffController = async (
 
   try {
     const staff = await deactivateManagerDepartmentStaff(
-      res.locals.session.user.id,
+      res.locals.user.id,
       staffId
     );
 

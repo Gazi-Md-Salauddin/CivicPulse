@@ -118,7 +118,7 @@ export const updateUserRoleController = async (
     }
 
     // Prevent admin from changing their own role
-    if (res.locals.session.user.id === id) {
+    if (res.locals.user.id === id) {
       return res.status(400).json({
         success: false,
         message: "You cannot change your own role.",
@@ -175,7 +175,7 @@ const updateUserStatusController = async (
   try {
     const id = String(req.params.id);
 
-    if (res.locals.session.user.id === id) {
+    if (res.locals.user.id === id) {
       return res.status(400).json({
         success: false,
         message: "You cannot change your own account status.",

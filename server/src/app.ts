@@ -7,8 +7,6 @@ import express, {
 
 import cors from "cors";
 import multer from "multer";
-import { toNodeHandler } from "better-auth/node";
-import { auth } from "./lib/auth.js";
 import issueRoutes from './routes/reportIssue.route.js';
 import issueImageRoutes from "./routes/issue-image.route.js";
 import publicIssueRoutes from "./routes/publicIssue.route.js";
@@ -22,7 +20,7 @@ const app: Express = express();
 
 app.use(
   cors({
-    origin: process.env.NEXT_PUBLIC_URL || 'http://localhost:3000',
+    origin: process.env.AUTH_URL || 'http://localhost:3000',
     credentials: true,
   })
 );
@@ -48,8 +46,6 @@ app.use("/api/admin/departments", departmentRoutes);
 
 app.use("/api/admin/issues", adminIssueRoutes);
 
-// BetterAuth route
-app.all("/api/auth/*splat", toNodeHandler(auth));
 
 const apiErrorHandler: ErrorRequestHandler = (
   error,
