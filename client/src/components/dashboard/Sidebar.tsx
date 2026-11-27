@@ -137,6 +137,16 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
           },
         ],
       },
+      {
+        title: "Account",
+        items: [
+          {
+            label: "Profile Settings",
+            href: "/dashboard/admin/profile",
+            icon: Person,
+          },
+        ],
+      },
     ],
 
     supportTitle: "System Support",
@@ -167,6 +177,16 @@ const sidebarConfig: Record<UserRole, RoleConfig> = {
           {
             label: "Team Management",
             href: "/dashboard/department-manager/team",
+            icon: Person,
+          },
+        ],
+      },
+      {
+        title: "Account",
+        items: [
+          {
+            label: "Profile Settings",
+            href: "/dashboard/department-manager/profile",
             icon: Person,
           },
         ],

@@ -178,7 +178,7 @@ export default function HowItWorks() {
           </div>
 
           <Link
-            href="/citizen-reporting"
+            href="/create-issue"
             className="group mt-7 inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-6 py-3.5 text-sm font-bold text-teal-800 transition-all hover:-translate-y-1 hover:bg-teal-50 lg:mt-0"
           >
             Start Reporting
