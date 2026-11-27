@@ -101,11 +101,7 @@ export default function Navbar() {
           >
             <MapPinned
               size={15}
-              className={
-                isLinkActive("/live-incident")
-                  ? "text-white"
-                  : "text-teal-700"
-              }
+              className="text-teal-700"
             />
             <span>Live Incident</span>
           </Link>

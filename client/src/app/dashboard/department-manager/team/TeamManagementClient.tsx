@@ -103,7 +103,7 @@ export default function ManagerTeamPage() {
 
   return (
     <main className="min-h-screen bg-[#F5FAF9] p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto container space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="flex items-center gap-2 text-sm font-semibold text-[#0F766E]">

@@ -202,7 +202,7 @@ function ManagerIssueDetailsContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center bg-[#F5FAF9]">
+      <div className="flex min-h-screen items-center justify-center bg-[#F5FAF9]">
         <div className="text-center">
           <RefreshCw
             size={30}
@@ -259,7 +259,7 @@ function ManagerIssueDetailsContent() {
 
   return (
     <div className="min-h-screen bg-[#F5FAF9] p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto container space-y-6">
         {/* Header */}
         <div>
           <button

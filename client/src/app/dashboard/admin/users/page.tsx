@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiUrl, parseApiResponse } from "@/services/api";
+import {
+  apiRequest,
+  parseApiResponse,
+} from "@/services/api";
 import {
   Search,
   Users,
@@ -121,11 +124,10 @@ export default function AdminUsersPage() {
         params.set("role", selectedRole);
       }
 
-      const response = await fetch(
-        `${apiUrl("admin/users")}?${params.toString()}`,
+      const response = await apiRequest(
+        `admin/users?${params.toString()}`,
         {
           method: "GET",
-          credentials: "include",
           cache: "no-store",
         }
       );
@@ -187,14 +189,10 @@ export default function AdminUsersPage() {
       setError("");
       setSuccess("");
 
-      const response = await fetch(
-        apiUrl(`admin/users/${userId}/role`),
+      const response = await apiRequest(
+        `admin/users/${userId}/role`,
         {
           method: "PATCH",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({ role: newRole }),
         }
       );
@@ -235,11 +233,10 @@ export default function AdminUsersPage() {
       setError("");
       setSuccess("");
 
-      const response = await fetch(
-        apiUrl(`admin/users/${userId}/${action}`),
+      const response = await apiRequest(
+        `admin/users/${userId}/${action}`,
         {
           method: "PATCH",
-          credentials: "include",
         }
       );
 
@@ -280,10 +277,13 @@ export default function AdminUsersPage() {
       setDetailsLoading(true);
       setError("");
 
-      const response = await fetch(apiUrl(`admin/users/${userId}`), {
-        credentials: "include",
-        cache: "no-store",
-      });
+      const response = await apiRequest(
+        `admin/users/${userId}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
 
       const result = await parseApiResponse<ApiResponse<User>>(response);
 
@@ -569,14 +569,14 @@ export default function AdminUsersPage() {
                       <td className="px-5 py-4">
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${user.is_active
-                              ? "bg-green-50 text-green-700"
-                              : "bg-red-50 text-red-700"
+                            ? "bg-green-50 text-green-700"
+                            : "bg-red-50 text-red-700"
                             }`}
                         >
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${user.is_active
-                                ? "bg-green-500"
-                                : "bg-red-500"
+                              ? "bg-green-500"
+                              : "bg-red-500"
                               }`}
                           />
                           {user.is_active ? "Active" : "Inactive"}
@@ -654,8 +654,8 @@ export default function AdminUsersPage() {
                                 : "Activate User"
                             }
                             className={`rounded-lg p-2 transition disabled:opacity-50 ${user.is_active
-                                ? "bg-red-50 text-red-600 hover:bg-red-100"
-                                : "bg-green-50 text-green-600 hover:bg-green-100"
+                              ? "bg-red-50 text-red-600 hover:bg-red-100"
+                              : "bg-green-50 text-green-600 hover:bg-green-100"
                               }`}
                           >
                             {user.is_active ? (
@@ -776,8 +776,8 @@ export default function AdminUsersPage() {
                 <span className="text-sm text-slate-500">Status</span>
                 <span
                   className={`text-sm font-semibold ${selectedUser.is_active
-                      ? "text-green-600"
-                      : "text-red-600"
+                    ? "text-green-600"
+                    : "text-red-600"
                     }`}
                 >
                   {selectedUser.is_active ? "Active" : "Inactive"}

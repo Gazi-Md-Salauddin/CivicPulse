@@ -1,4 +1,6 @@
+
 import { api, apiUrl, parseApiResponse } from "./api";
+
 import type {
   ICreateIssue,
   IIssueResponse,
@@ -13,22 +15,12 @@ export const createIssue = async (
   return api.post<IIssueResponse>("/issue", issueData);
 };
 
-
-// Get citizen own issue
+// Get citizen own issues
 export const getIssues = async (): Promise<IGetIssuesResponse> => {
-  const response = await fetch(apiUrl("issue"), {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  return parseApiResponse<IGetIssuesResponse>(response);
+  return api.get<IGetIssuesResponse>("/issue");
 };
 
-
-// Get all citizen issue
+// Get all public issues
 export const getAllPublicIssues = async (): Promise<IGetIssuesResponse> => {
   const response = await fetch(apiUrl("public/issues"), {
     method: "GET",
@@ -38,8 +30,7 @@ export const getAllPublicIssues = async (): Promise<IGetIssuesResponse> => {
   return parseApiResponse<IGetIssuesResponse>(response);
 };
 
-
-// Get issue by id
+// Public issue details
 export interface IPublicIssueDetailsResponse {
   success: boolean;
   message: string;

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiUrl, parseApiResponse } from "@/services/api";
+import { authClient } from "@/lib/auth-client";
 import {
   Search,
   MapPin,
@@ -38,7 +39,7 @@ type Issue = {
   status: string;
   created_at: string;
   updated_at: string;
-  assigned_staff: AssignedStaff[];
+  assigned_staff?: AssignedStaff[];
 };
 
 type Pagination = {
@@ -99,8 +100,16 @@ function formatStatus(status: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-GB", {
+function formatDate(date?: string | null) {
+  if (!date) return "N/A";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "N/A";
+  }
+
+  return parsedDate.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -127,49 +136,73 @@ export default function ManagerIssuesPage() {
   const [error, setError] = useState("");
 
   const fetchIssues = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
+  try {
+    setLoading(true);
+    setError("");
 
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: "10",
-      });
+    // 1. Get JWT from Better Auth
+    const { data, error: tokenError } = await authClient.token();
 
-      if (status !== "All") {
-        params.set("status", status.toLowerCase().replace(/\s+/g, "_"));
-      }
-
-      if (search.trim()) {
-        params.set("search", search.trim());
-      }
-
-      const response = await fetch(
-        apiUrl(`manager/departmentissues?${params.toString()}`),
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
+    if (tokenError || !data?.token) {
+      throw new Error(
+        tokenError?.message || "Unable to retrieve authentication token."
       );
-
-      const result = await parseApiResponse<IssuesResponse>(response);
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to load issues");
-      }
-
-      setIssues(result.data.issues || []);
-      setDepartmentName(result.data.department?.name || "");
-      setPagination(result.data.pagination);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Something went wrong"
-      );
-    } finally {
-      setLoading(false);
     }
-  }, [page, search, status]);
+
+    // 2. Build query parameters
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: "10",
+    });
+
+    if (status !== "All") {
+      params.set(
+        "status",
+        status.toLowerCase().replace(/\s+/g, "_")
+      );
+    }
+
+    if (search.trim()) {
+      params.set("search", search.trim());
+    }
+
+    // 3. Send JWT to Express backend
+    const response = await fetch(
+      apiUrl(`manager/departmentissues?${params.toString()}`),
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${data.token}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      }
+    );
+
+    // 4. Parse API response
+    const result = await parseApiResponse<IssuesResponse>(response);
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Failed to load department issues."
+      );
+    }
+
+    // 5. Update state
+    setIssues(result.data.issues || []);
+    setDepartmentName(result.data.department?.name || "");
+    setPagination(result.data.pagination);
+
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Something went wrong."
+    );
+  } finally {
+    setLoading(false);
+  }
+}, [page, search, status]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -265,7 +298,7 @@ export default function ManagerIssuesPage() {
                 <h2 className="mt-2 text-2xl font-bold text-gray-900">
                   {issues.reduce(
                     (total, issue) =>
-                      total + issue.assigned_staff.length,
+                      total + (issue.assigned_staff || []).length,
                     0
                   )}
                 </h2>
@@ -412,14 +445,14 @@ export default function ManagerIssuesPage() {
                         </td>
 
                         <td className="px-5 py-4">
-                          {issue.assigned_staff.length > 0 ? (
+                          {(issue.assigned_staff || []).length > 0 ? (
                             <div>
                               <p className="text-sm font-medium text-gray-800">
-                                {issue.assigned_staff[0].name}
+                                {issue.assigned_staff![0].name}
                               </p>
-                              {issue.assigned_staff.length > 1 && (
+                              {(issue.assigned_staff || []).length > 1 && (
                                 <p className="mt-1 text-xs text-gray-500">
-                                  +{issue.assigned_staff.length - 1} more
+                                  +{(issue.assigned_staff || []).length - 1} more
                                 </p>
                               )}
                             </div>
@@ -508,8 +541,8 @@ export default function ManagerIssuesPage() {
 
                       <div className="flex items-center gap-2">
                         <Users size={14} />
-                        {issue.assigned_staff.length > 0
-                          ? issue.assigned_staff.map((staff) => staff.name).join(", ")
+                        {(issue.assigned_staff || []).length > 0
+                          ? (issue.assigned_staff || []).map((staff) => staff.name).join(", ")
                           : "Not assigned"}
                       </div>
                     </div>

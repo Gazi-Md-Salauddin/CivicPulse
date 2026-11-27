@@ -1,66 +1,90 @@
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+import { authClient } from "@/lib/auth-client";
 
-export const apiUrl = (endpoint: string): string => {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL is not configured");
-  }
+export const apiUrl = (endpoint: string) => {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
-  return `${API_URL}/${endpoint.replace(/^\/+/, "")}`;
+  return `${baseUrl}/${endpoint.replace(/^\/+/, "")}`;
 };
 
-const getErrorMessage = (payload: unknown): string | undefined => {
-  if (
-    typeof payload === "object" &&
-    payload !== null &&
-    "message" in payload &&
-    typeof payload.message === "string"
-  ) {
-    return payload.message;
+export const getAccessToken = async (): Promise<string> => {
+  const { data, error } = await authClient.token();
+
+  if (error || !data?.token) {
+    throw new Error("Authentication required. Please login again.");
   }
 
-  return undefined;
+  return data.token;
+};
+
+export const apiRequest = async (
+  endpoint: string,
+  options: RequestInit = {}
+) => {
+  const token = await getAccessToken();
+
+  const headers = new Headers(options.headers);
+
+  headers.set("Authorization", `Bearer ${token}`);
+
+  if (
+    options.body &&
+    !(options.body instanceof FormData) &&
+    !headers.has("Content-Type")
+  ) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  return fetch(apiUrl(endpoint), {
+    ...options,
+    headers,
+    cache: options.cache ?? "no-store",
+  });
 };
 
 export const parseApiResponse = async <T>(
   response: Response
 ): Promise<T> => {
-  const contentType = response.headers.get("content-type")?.toLowerCase();
+  const result = await response.json();
 
-  if (!contentType?.includes("json")) {
-    throw new Error(
-      response.ok
-        ? "The server returned a non-JSON response."
-        : `The request failed (${response.status}).`
-    );
+  if (!response.ok || result.success === false) {
+    throw new Error(result.message || "Something went wrong");
   }
 
-  let payload: unknown;
+  return result;
+};
 
-  try {
-    payload = await response.json();
-  } catch {
-    throw new Error("The server returned an invalid JSON response.");
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      getErrorMessage(payload) || `The request failed (${response.status}).`
-    );
-  }
-
-  return payload as T;
-}
-
+// Reusable API client
 export const api = {
-  async post<T>(endpoint: string, data: unknown): Promise<T> {
-    const response = await fetch(apiUrl(endpoint), {
+  get: async <T>(endpoint: string): Promise<T> => {
+    const response = await apiRequest(endpoint, {
+      method: "GET",
+    });
+
+    return parseApiResponse<T>(response);
+  },
+
+  post: async <T>(endpoint: string, body?: unknown): Promise<T> => {
+    const response = await apiRequest(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(data),
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    return parseApiResponse<T>(response);
+  },
+
+  patch: async <T>(endpoint: string, body?: unknown): Promise<T> => {
+    const response = await apiRequest(endpoint, {
+      method: "PATCH",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    return parseApiResponse<T>(response);
+  },
+
+  delete: async <T>(endpoint: string): Promise<T> => {
+    const response = await apiRequest(endpoint, {
+      method: "DELETE",
     });
 
     return parseApiResponse<T>(response);

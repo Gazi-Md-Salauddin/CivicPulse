@@ -1,3 +1,4 @@
+import { authClient } from "@/lib/auth-client";
 import { apiUrl, parseApiResponse } from "./api";
 
 export type IssuePriority = "low" | "medium" | "high" | "critical";
@@ -113,24 +114,39 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
+
+
 const request = async <T>(
   endpoint: string,
   init: RequestInit = {}
 ): Promise<ApiEnvelope<T>> => {
+  // Get JWT from Better Auth
+  const result = await authClient.token();
+
+  if (result.error || !result.data?.token) {
+    throw new Error("Authentication token not found. Please login again.");
+  }
+
+  const headers = new Headers(init.headers);
+
+  // Attach JWT
+  headers.set("Authorization", `Bearer ${result.data.token}`);
+
+  // JSON content type for non-FormData requests
+  if (!(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(apiUrl(endpoint), {
     ...init,
-    credentials: "include",
+    headers,
     cache: "no-store",
-    headers: {
-      ...(init.body instanceof FormData
-        ? {}
-        : { "Content-Type": "application/json" }),
-      ...init.headers,
-    },
   });
 
   return parseApiResponse<ApiEnvelope<T>>(response);
 };
+
+
 
 const postJson = (body: unknown): RequestInit => ({
   method: "POST",

@@ -1,8 +1,11 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { apiUrl, parseApiResponse } from "@/services/api";
+import { authClient } from "@/lib/auth-client";
+
 import {
   Activity,
   AlertCircle,
@@ -21,7 +24,6 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-
 
 // Types
 
@@ -124,10 +126,11 @@ const getInitials = (name?: string | null) => {
     .join("");
 };
 
-
 // Dashboard Component
 
 export default function DepartmentManagerDashboard() {
+  // States
+
   const [dashboard, setDashboard] =
     useState<DashboardData | null>(null);
 
@@ -137,28 +140,55 @@ export default function DepartmentManagerDashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  // Fetch Dashboard API
+  // Fetch Dashboard
 
   const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetch(apiUrl("manager/dashboard"), {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-      });
+      // 1. Get JWT from Better Auth
 
-      const result = await parseApiResponse<ApiResponse>(response);
+      const { data, error: tokenError } =
+        await authClient.token();
 
-      if (!response.ok || !result.success) {
+      if (tokenError || !data?.token) {
         throw new Error(
-          result.message || "Failed to load manager dashboard."
+          tokenError?.message ||
+            "Unable to retrieve authentication token. Please login again."
         );
       }
 
+      // 2. Send JWT to Express Backend
+
+      const response = await fetch(
+        apiUrl("manager/dashboard"),
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${data.token}`,
+            Accept: "application/json",
+          },
+          cache: "no-store",
+        }
+      );
+
+      // 3. Parse Response
+
+      const result =
+        await parseApiResponse<ApiResponse>(response);
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message ||
+            "Failed to load manager dashboard."
+        );
+      }
+
+      // 4. Update Dashboard
+
       setDashboard(result.data);
+
     } catch (err) {
       setError(
         err instanceof Error
@@ -170,6 +200,8 @@ export default function DepartmentManagerDashboard() {
     }
   }, []);
 
+  // Initial Fetch
+
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
@@ -177,7 +209,6 @@ export default function DepartmentManagerDashboard() {
   // Dashboard Data
 
   const department = dashboard?.department;
-
   const stats = dashboard?.statistics;
   const issues = dashboard?.recentIssues || [];
 
@@ -205,7 +236,6 @@ export default function DepartmentManagerDashboard() {
       return matchesSearch && matchesStatus;
     });
   }, [issues, search, statusFilter]);
-
 
   // Statistics
 
@@ -343,10 +373,7 @@ export default function DepartmentManagerDashboard() {
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                <CalendarDays
-                  size={17}
-                  className="text-[#0F766E]"
-                />
+                <CalendarDays size={17} className="text-[#0F766E]" />
                 {new Date().toLocaleDateString("en-GB", {
                   day: "2-digit",
                   month: "short",
@@ -378,11 +405,7 @@ export default function DepartmentManagerDashboard() {
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
               <div>
                 <div className="mb-3 flex items-center gap-2">
-                  <ShieldCheck
-                    size={18}
-                    className="text-teal-300"
-                  />
-
+                  <ShieldCheck size={18} className="text-teal-300" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-teal-200">
                     Department Workspace
                   </span>
@@ -419,9 +442,7 @@ export default function DepartmentManagerDashboard() {
 
                 <div>
                   <p className="text-3xl font-bold">
-                    {totalIssues - resolvedCount >= 0
-                      ? totalIssues - resolvedCount
-                      : 0}
+                    {Math.max(totalIssues - resolvedCount, 0)}
                   </p>
                   <p className="mt-1 text-xs text-teal-200">
                     Unresolved Issues
@@ -444,15 +465,12 @@ export default function DepartmentManagerDashboard() {
                     <p className="text-sm font-medium text-gray-500">
                       {stat.title}
                     </p>
-
                     <h2 className="mt-3 text-3xl font-bold text-gray-900">
                       {stat.value}
                     </h2>
                   </div>
 
-                  <div
-                    className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.color}`}
-                  >
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.color}`}>
                     {stat.icon}
                   </div>
                 </div>
@@ -467,7 +485,6 @@ export default function DepartmentManagerDashboard() {
           {/* Overview Panels */}
 
           <section className="mb-7 grid grid-cols-1 gap-5 lg:grid-cols-3">
-
             {/* Status Overview */}
 
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm lg:col-span-2">
@@ -476,67 +493,32 @@ export default function DepartmentManagerDashboard() {
                   <h2 className="font-bold text-gray-900">
                     Issue Status Overview
                   </h2>
-
                   <p className="mt-1 text-xs text-gray-500">
                     Current department issue distribution
                   </p>
                 </div>
-
-                <Activity
-                  size={20}
-                  className="text-[#0F766E]"
-                />
+                <Activity size={20} className="text-[#0F766E]" />
               </div>
 
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {[
-                  {
-                    title: "Submitted",
-                    value: stats?.pendingIssues ?? 0,
-                    color: "bg-blue-500",
-                  },
-                  {
-                    title: "Under Review",
-                    value: stats?.underReviewIssues ?? 0,
-                    color: "bg-amber-500",
-                  },
-                  {
-                    title: "In Progress",
-                    value: stats?.inProgressIssues ?? 0,
-                    color: "bg-cyan-500",
-                  },
-                  {
-                    title: "Resolved",
-                    value: stats?.resolvedIssues ?? 0,
-                    color: "bg-emerald-500",
-                  },
-                  {
-                    title: "Closed",
-                    value: stats?.closedIssues ?? 0,
-                    color: "bg-gray-500",
-                  },
+                  { title: "Submitted", value: stats?.pendingIssues ?? 0, color: "bg-blue-500" },
+                  { title: "Under Review", value: stats?.underReviewIssues ?? 0, color: "bg-amber-500" },
+                  { title: "In Progress", value: stats?.inProgressIssues ?? 0, color: "bg-cyan-500" },
+                  { title: "Resolved", value: stats?.resolvedIssues ?? 0, color: "bg-emerald-500" },
+                  { title: "Closed", value: stats?.closedIssues ?? 0, color: "bg-gray-500" },
                 ].map((item) => (
-                  <div
-                    key={item.title}
-                    className="rounded-xl border border-gray-100 p-4"
-                  >
+                  <div key={item.title} className="rounded-xl border border-gray-100 p-4">
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${item.color}`}
-                      />
-
+                      <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
                       <span className="text-xs font-medium text-gray-500">
                         {item.title}
                       </span>
                     </div>
-
                     <p className="mt-3 text-2xl font-bold text-gray-900">
                       {item.value}
                     </p>
-
-                    <p className="mt-1 text-xs text-gray-400">
-                      Issues
-                    </p>
+                    <p className="mt-1 text-xs text-gray-400">Issues</p>
                   </div>
                 ))}
               </div>
@@ -550,16 +532,11 @@ export default function DepartmentManagerDashboard() {
                   <h2 className="font-bold text-gray-900">
                     Resolution Rate
                   </h2>
-
                   <p className="mt-1 text-xs text-gray-500">
                     Overall department progress
                   </p>
                 </div>
-
-                <Activity
-                  size={20}
-                  className="text-[#0F766E]"
-                />
+                <Activity size={20} className="text-[#0F766E]" />
               </div>
 
               <div className="mt-7 flex items-center justify-center">
@@ -573,10 +550,7 @@ export default function DepartmentManagerDashboard() {
                     <p className="text-3xl font-bold text-gray-900">
                       {resolutionRate}%
                     </p>
-
-                    <p className="text-[10px] text-gray-400">
-                      Resolved
-                    </p>
+                    <p className="text-[10px] text-gray-400">Resolved</p>
                   </div>
                 </div>
               </div>
@@ -590,13 +564,11 @@ export default function DepartmentManagerDashboard() {
           {/* Recent Issues */}
 
           <section className="mb-7 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-
             <div className="flex flex-col justify-between gap-4 border-b border-gray-100 p-5 sm:flex-row sm:items-center">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
                   Recent Department Issues
                 </h2>
-
                 <p className="mt-1 text-sm text-gray-500">
                   Review and monitor recently reported issues.
                 </p>
@@ -619,7 +591,6 @@ export default function DepartmentManagerDashboard() {
                   size={18}
                   className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
                 />
-
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -634,12 +605,9 @@ export default function DepartmentManagerDashboard() {
                     size={15}
                     className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                   />
-
                   <select
                     value={statusFilter}
-                    onChange={(e) =>
-                      setStatusFilter(e.target.value)
-                    }
+                    onChange={(e) => setStatusFilter(e.target.value)}
                     className="h-11 appearance-none rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-8 text-sm text-gray-600 outline-none focus:border-[#0F766E]"
                   >
                     <option value="All">All Status</option>
@@ -651,7 +619,6 @@ export default function DepartmentManagerDashboard() {
                     <option value="Closed">Closed</option>
                   </select>
                 </div>
-
               </div>
             </div>
 
@@ -661,63 +628,36 @@ export default function DepartmentManagerDashboard() {
               <table className="w-full min-w-[900px] text-left">
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
-                    <th className="px-5 py-4 font-semibold">
-                      Issue Details
-                    </th>
-
-                    <th className="px-5 py-4 font-semibold">
-                      Status
-                    </th>
-
-                    <th className="px-5 py-4 font-semibold">
-                      Assigned Staff
-                    </th>
-
-                    <th className="px-5 py-4 font-semibold">
-                      Reported
-                    </th>
-
-                    <th className="px-5 py-4 text-right font-semibold">
-                      Action
-                    </th>
+                    <th className="px-5 py-4 font-semibold">Issue Details</th>
+                    <th className="px-5 py-4 font-semibold">Status</th>
+                    <th className="px-5 py-4 font-semibold">Assigned Staff</th>
+                    <th className="px-5 py-4 font-semibold">Reported</th>
+                    <th className="px-5 py-4 text-right font-semibold">Action</th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-gray-100">
                   {filteredIssues.map((issue) => {
                     const assignedName =
-                      issue.assigned_staff_name ||
-                      issue.assignedTo;
+                      issue.assigned_staff_name || issue.assignedTo;
 
                     return (
-                      <tr
-                        key={issue.id}
-                        className="transition hover:bg-gray-50/70"
-                      >
+                      <tr key={issue.id} className="transition hover:bg-gray-50/70">
                         <td className="px-5 py-4">
                           <p className="text-sm font-semibold text-gray-900">
                             {issue.title}
                           </p>
-
                           <p className="mt-1 text-xs text-gray-400">
                             {issue.id} · {issue.category}
                           </p>
-
                           <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
-                            <MapPin
-                              size={13}
-                              className="text-[#0F766E]"
-                            />
-                            {issue.location_address ||
-                              issue.location ||
-                              "Location unavailable"}
+                            <MapPin size={13} className="text-[#0F766E]" />
+                            {issue.location_address || issue.location || "Location unavailable"}
                           </p>
                         </td>
 
                         <td className="px-5 py-4">
-                          <span
-                            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusStyle(issue.status)}`}
-                          >
+                          <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusStyle(issue.status)}`}>
                             {formatStatus(issue.status)}
                           </span>
                         </td>
@@ -728,7 +668,6 @@ export default function DepartmentManagerDashboard() {
                               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#CCFBF1] text-[10px] font-bold text-[#0F766E]">
                                 {getInitials(assignedName)}
                               </div>
-
                               <span className="text-xs font-medium text-gray-700">
                                 {assignedName}
                               </span>
@@ -741,9 +680,7 @@ export default function DepartmentManagerDashboard() {
                         </td>
 
                         <td className="px-5 py-4 text-xs text-gray-500">
-                          {formatDate(
-                            issue.created_at || issue.createdAt
-                          )}
+                          {formatDate(issue.created_at || issue.createdAt)}
                         </td>
 
                         <td className="px-5 py-4">
@@ -763,10 +700,7 @@ export default function DepartmentManagerDashboard() {
 
                   {filteredIssues.length === 0 && (
                     <tr>
-                      <td
-                        colSpan={5}
-                        className="px-5 py-12 text-center text-sm text-gray-500"
-                      >
+                      <td colSpan={5} className="px-5 py-12 text-center text-sm text-gray-500">
                         No issues found.
                       </td>
                     </tr>
@@ -779,51 +713,36 @@ export default function DepartmentManagerDashboard() {
 
             <div className="space-y-3 p-4 md:hidden">
               {filteredIssues.map((issue) => (
-                <div
-                  key={issue.id}
-                  className="rounded-xl border border-gray-100 p-4"
-                >
+                <div key={issue.id} className="rounded-xl border border-gray-100 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-[#0F766E]">
                         {issue.id}
                       </p>
-
                       <h3 className="mt-1 text-sm font-bold text-gray-900">
                         {issue.title}
                       </h3>
                     </div>
-
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${getStatusStyle(issue.status)}`}
-                    >
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${getStatusStyle(issue.status)}`}>
                       {formatStatus(issue.status)}
                     </span>
                   </div>
 
                   <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
                     <MapPin size={14} />
-                    {issue.location_address ||
-                      issue.location ||
-                      "Location unavailable"}
+                    {issue.location_address || issue.location || "Location unavailable"}
                   </p>
 
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <span className="text-xs text-gray-400">
-                      {formatDate(
-                        issue.created_at || issue.createdAt
-                      )}
+                      {formatDate(issue.created_at || issue.createdAt)}
                     </span>
-
                     <Link
                       href={`/dashboard/department-manager/department-issues/${issue.id}`}
                       className="text-xs font-semibold text-[#0F766E]"
                     >
                       View Details
-                      <ArrowUpRight
-                        size={14}
-                        className="ml-1 inline"
-                      />
+                      <ArrowUpRight size={14} className="ml-1 inline" />
                     </Link>
                   </div>
                 </div>
@@ -840,18 +759,13 @@ export default function DepartmentManagerDashboard() {
           {/* Department Management Links */}
 
           <section className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 text-[#0F766E]">
                   <Users size={21} />
                 </div>
-
                 <div>
-                  <h2 className="font-bold text-gray-900">
-                    Maintenance Team
-                  </h2>
-
+                  <h2 className="font-bold text-gray-900">Maintenance Team</h2>
                   <p className="mt-1 text-xs text-gray-500">
                     {stats?.assignedStaffCount ?? 0} staff members
                   </p>
@@ -861,7 +775,6 @@ export default function DepartmentManagerDashboard() {
               <p className="mt-4 text-sm text-gray-500">
                 View your department&apos;s maintenance staff and manage task assignments.
               </p>
-
               <p className="mt-5 text-xs text-gray-400">
                 Staff management is not available yet.
               </p>
@@ -872,12 +785,8 @@ export default function DepartmentManagerDashboard() {
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                   <Activity size={21} />
                 </div>
-
                 <div>
-                  <h2 className="font-bold text-gray-900">
-                    Department Reports
-                  </h2>
-
+                  <h2 className="font-bold text-gray-900">Department Reports</h2>
                   <p className="mt-1 text-xs text-gray-500">
                     Department performance
                   </p>
@@ -887,7 +796,6 @@ export default function DepartmentManagerDashboard() {
               <p className="mt-4 text-sm text-gray-500">
                 Review department issue statistics and monitor resolution progress.
               </p>
-
               <p className="mt-5 text-xs text-gray-400">
                 Detailed analytics are not available yet.
               </p>

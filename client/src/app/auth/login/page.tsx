@@ -1,4 +1,6 @@
-"use client"
+
+"use client";
+
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,16 +12,40 @@ import {
   Activity,
   MapPin,
   Landmark,
-  CheckCircle2,
-  Globe2,
 } from "lucide-react";
 import { useState } from "react";
-import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
+
+const demoAccounts = [
+  {
+    role: "Citizen",
+    email: "citizen@gmail.com",
+    password: "*Citizen1234#",
+    icon: Users,
+  },
+  {
+    role: "Maintenance Staff",
+    email: "staff12@gmail.com",
+    password: "*Staff1234#",
+    icon: Activity,
+  },
+  {
+    role: "Department Manager",
+    email: "manager@gmail.com",
+    password: "*Manager1234#",
+    icon: Building2,
+  },
+  {
+    role: "Admin",
+    email: "admin@gmail.com",
+    password: "*Admin1234#",
+    icon: ShieldCheck,
+  },
+];
 
 export default function LoginPage() {
-
-  const router = useRouter()
+  const router = useRouter();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -29,43 +55,59 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     setError("");
     setLoading(true);
 
     try {
-      const { data, error } = await authClient.signIn.email({
-        email: formData.email,
-        password: formData.password,
-      });
+      const { data, error: loginError } =
+        await authClient.signIn.email({
+          email: formData.email.trim(),
+          password: formData.password,
+        });
 
-      if (error) {
-        setError(error.message ?? "Registration failed.");
+      if (loginError) {
+        setError(loginError.message || "Invalid email or password.");
+        return;
+      }
+
+      if (!data) {
+        setError("Unable to sign in. Please try again.");
+        return;
+      }
+
+      // Verify JWT endpoint is available and token can be generated.
+      const { data: tokenData, error: tokenError } =
+        await authClient.token();
+
+      if (tokenError || !tokenData?.token) {
+        setError("Login successful, but token generation failed. Please try again.");
         return;
       }
 
       router.push("/");
       router.refresh();
-
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDemoLogin = (email: string, password: string) => {
+    setFormData({ email, password });
+    setError("");
+  };
 
   return (
     <main className="min-h-screen bg-[#F3F6FC] p-4 sm:p-6 lg:p-10">
       <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl items-center justify-center">
-
         <div className="grid w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/4 lg:grid-cols-2">
 
           {/* Left Branding Panel */}
           <section className="relative hidden overflow-hidden bg-[#0F766E] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
-
             <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full border border-white/10" />
             <div className="absolute -right-12 -top-12 h-56 w-56 rounded-full border border-white/10" />
             <div className="absolute -bottom-28 -left-20 h-80 w-80 rounded-full bg-white/4" />
@@ -101,7 +143,6 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              {/* Feature Cards */}
               <div className="mt-12 space-y-3">
                 {[
                   {
@@ -121,6 +162,7 @@ export default function LoginPage() {
                   },
                 ].map((item) => {
                   const Icon = item.icon;
+
                   return (
                     <div
                       key={item.title}
@@ -148,7 +190,6 @@ export default function LoginPage() {
 
           {/* Right Login Form */}
           <section className="flex flex-col justify-center px-5 py-10 sm:px-10 lg:px-12 xl:px-16">
-
             {/* Mobile Logo */}
             <Link href="/" className="mb-10 flex items-center gap-3 lg:hidden">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0F766E] text-white">
@@ -165,7 +206,6 @@ export default function LoginPage() {
             </Link>
 
             <div className="mx-auto w-full max-w-md">
-
               <div className="mb-8">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50 text-[#0F766E]">
                   <LockKeyhole size={23} />
@@ -185,15 +225,21 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              {/* Form */}
+              {/* Login Form */}
               <form className="space-y-5" onSubmit={handleLogin}>
                 <div>
-                  <label className="mb-2 block text-md font-semibold text-slate-700">
+                  <label
+                    htmlFor="email"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
                     Email Address
                   </label>
+
                   <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 transition focus-within:border-[#0F766E] focus-within:ring-2 focus-within:ring-teal-50">
                     <Mail size={17} className="text-slate-400" />
+
                     <input
+                      id="email"
                       type="email"
                       name="email"
                       placeholder="you@example.com"
@@ -201,7 +247,10 @@ export default function LoginPage() {
                       required
                       value={formData.email}
                       onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
+                        setFormData({
+                          ...formData,
+                          email: e.target.value,
+                        })
                       }
                       className="h-12 w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
                     />
@@ -210,9 +259,13 @@ export default function LoginPage() {
 
                 <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <label className="text-md font-semibold text-slate-700">
+                    <label
+                      htmlFor="password"
+                      className="text-sm font-semibold text-slate-700"
+                    >
                       Password
                     </label>
+
                     <Link
                       href="/forgot-password"
                       className="text-sm font-semibold text-[#0F766E] hover:underline"
@@ -223,7 +276,9 @@ export default function LoginPage() {
 
                   <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 transition focus-within:border-[#0F766E] focus-within:ring-2 focus-within:ring-teal-50">
                     <LockKeyhole size={17} className="text-slate-400" />
+
                     <input
+                      id="password"
                       type="password"
                       name="password"
                       placeholder="Enter your password"
@@ -231,35 +286,41 @@ export default function LoginPage() {
                       required
                       value={formData.password}
                       onChange={(e) =>
-                        setFormData({ ...formData, password: e.target.value })
+                        setFormData({
+                          ...formData,
+                          password: e.target.value,
+                        })
                       }
                       className="h-12 w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-500">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-[#0F766E]"
-                    />
-                    Remember me
-                  </label>
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+                  >
+                    {error}
+                  </div>
+                )}
 
+                <div className="flex items-center justify-end">
                   <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                     <ShieldCheck size={14} />
                     Secure Login
                   </span>
                 </div>
 
-                <button type="submit" disabled={loading}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F766E] text-sm font-bold text-white transition hover:bg-[#115E59] disabled:cursor-not-allowed disabled:opacity-60">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F766E] text-sm font-bold text-white transition hover:bg-[#115E59] disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   {loading ? "Signing in..." : "Sign In"}
                   {!loading && <ArrowRight size={17} />}
                 </button>
               </form>
-
 
               {/* Demo Accounts */}
               <div className="mt-7">
@@ -279,33 +340,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-
-                  {[
-                    {
-                      role: "Citizen",
-                      email: "citizen@gmail.com",
-                      password: "*Citizen1234#",
-                      icon: Users,
-                    },
-                    {
-                      role: "Maintenance Staff",
-                      email: "staff12@gmail.com",
-                      password: "*Staff1234#",
-                      icon: Activity,
-                    },
-                    {
-                      role: "Department Manager",
-                      email: "manager@gmail.com",
-                      password: "*Manager1234#",
-                      icon: Building2,
-                    },
-                    {
-                      role: "Admin",
-                      email: "admin@gmail.com",
-                      password: "*Admin1234#",
-                      icon: ShieldCheck,
-                    },
-                  ].map((demo) => {
+                  {demoAccounts.map((demo) => {
                     const Icon = demo.icon;
 
                     return (
@@ -329,10 +364,7 @@ export default function LoginPage() {
                           type="button"
                           disabled={loading}
                           onClick={() =>
-                            setFormData({
-                              email: demo.email,
-                              password: demo.password,
-                            })
+                            handleDemoLogin(demo.email, demo.password)
                           }
                           className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 text-xs font-bold text-[#0F766E] transition hover:bg-[#0F766E] hover:text-white disabled:opacity-50"
                         >
@@ -348,8 +380,6 @@ export default function LoginPage() {
                   Demo credentials are provided for testing purposes only.
                 </p>
               </div>
-
-
 
               <p className="mt-8 text-center text-sm text-slate-500">
                 Don't have an account?{" "}
